@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>デスクトップ風電卓</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="calculator">
+        <div class="mode-switcher">
+            <button class="mode-button active" data-mode="normal">通常計算</button>
+            <button class="mode-button" data-mode="date">日付計算</button>
+            <button class="mode-button" data-mode="time">時間計算</button>
+        </div>
+
+        <div class="display">
+            <div class="history"></div>
+            <div class="result">0</div>
+        </div>
+
+        <div id="normal-calculator-panel">
+            <div class="buttons">
+                <button class="button function tax">税抜</button>
+                <button class="button function tax">税込</button>
+    
+                <button class="button function">AC</button>
+                <button class="button function">DEL</button>
+                <button class="button function">+/-</button>
+                <button class="button operator">÷</button>
+    
+                <button class="button number">7</button>
+                <button class="button number">8</button>
+                <button class="button number">9</button>
+                <button class="button operator">×</button>
+    
+                <button class="button number">4</button>
+                <button class="button number">5</button>
+                <button class="button number">6</button>
+                <button class="button operator">-</button>
+    
+                <button class="button number">1</button>
+                <button class="button number">2</button>
+                <button class="button number">3</button>
+                <button class="button operator">+</button>
+    
+                <button class="button number zero">0</button>
+                <button class="button number">.</button>
+                <button class="button equals">=</button>
+            </div>
+        </div>
+
+        <div id="date-calculator-panel" style="display: none;">
+            <div class="date-group">
+                <label for="base-date">基準日</label>
+                <input type="date" id="base-date" class="date-input">
+            </div>
+            <div class="date-group">
+                <label for="days-to-add">日数</label>
+                <input type="number" id="days-to-add" class="date-input" value="0">
+            </div>
+            <div class="date-options">
+                <input type="checkbox" id="count-start-day">
+                <label for="count-start-day">開始日を1日目として計算</label>
+            </div>
+            <div class="date-calc-buttons">
+                <button id="add-days" class="button date-op-button">日数を加算</button>
+                <button id="subtract-days" class="button date-op-button">日数を減算</button>
+            </div>
+            <div class="date-result">
+                <p>結果： <span id="calculated-date">---</span></p>
+            </div>
+        </div>
+
+        <div id="time-calculator-panel" style="display: none;">
+            <div class="time-inputs">
+                <div class="time-group">
+                    <label for="start-hours">開始 時</label>
+                    <input type="number" id="start-hours" class="time-input" value="0" min="0" max="23">
+                </div>
+                <div class="time-group">
+                    <label for="start-minutes">開始 分</label>
+                    <input type="number" id="start-minutes" class="time-input" value="0" min="0" max="59">
+                </div>
+            </div>
+            <div class="time-inputs">
+                <div class="time-group">
+                    <label for="end-hours">終了 時</label>
+                    <input type="number" id="end-hours" class="time-input" value="0" min="0" max="23">
+                </div>
+                <div class="time-group">
+                    <label for="end-minutes">終了 分</label>
+                    <input type="number" id="end-minutes" class="time-input" value="0" min="0" max="59">
+                </div>
+            </div>
+            <button id="calculate-time-diff" class="button time-op-button">時間を計算</button>
+            <div class="time-result">
+                <p>差は： <span id="time-diff-result">---</span></p>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

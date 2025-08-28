@@ -1,0 +1,131 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.timer-container {
+    background-color: white;
+    padding: 25px 35px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    width: 420px; /* Adjusted width */
+}
+
+.mode-switcher {
+    display: flex;
+    background-color: #e9ecef;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 8px 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: center;
+    border: none;
+    background-color: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #495057;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.mode-btn.active {
+    background-color: #ffffff;
+    color: #007bff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.settings-box {
+    border-top: 1px solid #e9ecef;
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.settings-heading {
+    text-align: left;
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.input-container {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.input-container label {
+    font-size: 1.1rem;
+    margin-left: 4px; /* Space after input */
+    margin-right: 15px; /* Space before next input */
+}
+
+.input-container input {
+    width: 55px;
+    font-size: 1.4rem;
+    text-align: center;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+/* Hide number input arrows */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}
+
+#timer-display {
+    text-align: center;
+    font-size: 3.8rem;
+    font-family: 'Courier New', Courier, monospace;
+    margin: 20px 0;
+    color: #333;
+}
+
+.buttons {
+    text-align: center;
+}
+
+.buttons button {
+    font-size: 1.2rem;
+    padding: 10px 25px;
+    margin: 0 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.1s;
+    color: white;
+}
+
+#start-btn {
+    background-color: #28a745;
+}
+
+#stop-btn {
+    background-color: #dc3545;
+}
+
+#reset-btn {
+    background-color: #6c757d;
+}
+
+.hidden {
+    display: none;
+}
+

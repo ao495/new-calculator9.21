@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイマーアプリ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="timer-container">
+        <div class="mode-switcher">
+            <button id="stopwatch-mode-btn" class="mode-btn active">ストップウォッチ</button>
+            <button id="countdown-mode-btn" class="mode-btn">カウントダウン</button>
+        </div>
+        <div id="settings-box" class="settings-box hidden">
+            <h5 class="settings-heading">カウントダウン設定</h5>
+            <div class="input-container">
+                <input type="number" id="minutes-input" min="0" max="59" placeholder="00">
+                <label for="minutes-input">分</label>
+                <input type="number" id="seconds-input" min="0" max="59" placeholder="00">
+                <label for="seconds-input">秒</label>
+            </div>
+        </div>
+        <div id="timer-display">00:00:00.000</div>
+        <div class="buttons">
+            <button id="start-btn">スタート</button>
+            <button id="stop-btn">ストップ</button>
+            <button id="reset-btn">リセット</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

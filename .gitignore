@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# Log files
+*.log
+debug_log.txt
+
+# User-specific files
+config.json
+last_folder.json
+cookies.txt
+downloaded_videos.txt
+
+# Output files
+output_*.docx
+output_final/
+part/
+
+# Dependencies
+ffmpeg/
