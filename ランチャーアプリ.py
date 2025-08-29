@@ -78,7 +78,7 @@ class AppLauncher(TkinterDnD.Tk):
         frame = ttk.Frame(self.tab_control)
         self.tabs[name] = frame
         # 常に末尾から2番目（「起動中一覧」タブの前）に挿入
-        self.tab_control.insert(self.tab_control.index('end') -1, frame, text=name)
+        self.tab_control.insert(self.tab_control.index('end') if self.status_tree is not None else 'end', frame, text=name)
 
         canvas = tk.Canvas(frame)
         scrollbar = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
@@ -92,7 +92,7 @@ class AppLauncher(TkinterDnD.Tk):
         self._refresh_tab_buttons(name)
 
         scroll_frame.drop_target_register(DND_FILES)
-        scroll_frame.dnd_bind('<<Drop>>', lambda e, n=name: self._on_drop_app(e, n))
+        scroll_frame.dnd_bind('<<Drop>>', lambda e, n=name, f=scroll_frame: self._on_drop_app(e, n, f))
 
     def _create_status_tab(self):
         status_tab = ttk.Frame(self.tab_control)
@@ -115,11 +115,10 @@ class AppLauncher(TkinterDnD.Tk):
 
     def _refresh_tab_buttons(self, tab_name):
         frame = self.tabs[tab_name]
-        # scroll_frame の取得をより堅牢に
         try:
             scroll_frame = frame.winfo_children()[0].winfo_children()[0]
         except IndexError:
-            return # まだUIが構築されていない場合は何もしない
+            return
             
         for w in scroll_frame.winfo_children():
             w.destroy()
@@ -136,21 +135,21 @@ class AppLauncher(TkinterDnD.Tk):
         try:
             selected_tab_name = self.tab_control.tab(self.tab_control.select(), "text")
         except tk.TclError:
-            return # ウィジェット破棄中のエラーを無視
+            return
         for tab_name, tray_icon in self.tab_tray_icons.items():
             if self.tab_running_flags.get(tab_name, False):
                 color = "green" if tab_name == selected_tab_name else "blue"
                 tray_icon.icon = self._create_tray_image(color)
 
-    def _on_drop_app(self, event, tab_name):
+    def _on_drop_app(self, event, tab_name, scroll_frame):
         files = self.tk.splitlist(event.data)
         for f in files:
             if os.path.isfile(f):
                 if tab_name not in self.app_groups:
                     self.app_groups[tab_name] = []
                 self.app_groups[tab_name].append(f)
+                self._add_app_button(scroll_frame, tab_name, f)
         self._save_apps()
-        self._refresh_tab_buttons(tab_name)
 
     def _on_app_right_click(self, event, tab_name, app_path, btn_frame):
         menu = tk.Menu(self, tearoff=0)
@@ -246,23 +245,18 @@ class AppLauncher(TkinterDnD.Tk):
             return
         seconds = simpledialog.askinteger("タブタイマー", f"{tab_name} タブの全アプリ終了までの時間（秒）:", minvalue=1)
         if seconds and seconds > 0:
-            # タイマー開始前にアプリを起動
             self._run_apps_in_tab(tab_name)
-            # スレッドでタイマーを開始
             threading.Thread(target=self._start_timer_thread, args=(tab_name, seconds), daemon=True).start()
 
     def _start_timer_thread(self, tab_name, seconds):
-        # pystrayは自身のスレッドで実行する必要がある
         icon = pystray.Icon(tab_name, self._create_tray_image("blue"), f"{tab_name} タイマー")
         self.tab_tray_icons[tab_name] = icon
         
-        # icon.run()はブロッキングなので、別スレッドで実行
         threading.Thread(target=icon.run, daemon=True).start()
 
         self.tab_timers[tab_name] = seconds
         self.tab_running_flags[tab_name] = True
         
-        # afterはメインスレッドで実行される必要があるため、ここから呼び出す
         self.after(100, lambda: self._timer_countdown(tab_name))
 
     def _timer_countdown(self, tab_name):
