@@ -8,6 +8,7 @@ import json
 import os
 import pystray
 from PIL import Image, ImageDraw
+import pylnk3
 
 APP_JSON = "apps.json"
 
@@ -194,8 +195,12 @@ class AppLauncher(TkinterDnD.Tk):
         self.app_status[tab_name] = []
         for app_path in self.app_groups.get(tab_name, []):
             try:
-                # パスをリストで渡すように修正
-                proc = subprocess.Popen([app_path])
+                target_path = app_path
+                if app_path.lower().endswith('.lnk'):
+                    link = pylnk3.Lnk(app_path)
+                    target_path = link.path
+                
+                proc = subprocess.Popen([target_path])
                 self.running_processes[tab_name].append(proc)
                 self.app_status[tab_name].append({'name': app_path, 'proc': proc, 'status': '起動中'})
             except Exception as e:
