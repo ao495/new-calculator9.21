@@ -9,6 +9,7 @@ import os
 import pystray
 from PIL import Image, ImageDraw
 import pylnk3
+import psutil
 
 APP_JSON = "apps.json"
 
@@ -109,7 +110,6 @@ class AppLauncher(TkinterDnD.Tk):
     def _add_app_button(self, parent_frame, tab_name, app_path):
         btn_frame = tk.Frame(parent_frame)
         
-        # 個別起動メソッドを呼び出すように修正
         btn = tk.Button(btn_frame, text=os.path.basename(app_path), width=30, anchor='w',
                         command=lambda p=app_path, t=tab_name: self._run_single_app(p, t))
         btn.pack(side="left", fill="x", expand=True)
@@ -209,16 +209,20 @@ class AppLauncher(TkinterDnD.Tk):
         self._update_status_table()
 
     def _kill_apps_in_tab(self, tab_name):
-        for proc in self.running_processes.get(tab_name, []):
+        pids_to_kill = [p.pid for p in self.running_processes.get(tab_name, [])]
+
+        for pid in pids_to_kill:
             try:
-                # taskkillでプロセスツリーを強制終了
-                subprocess.run(
-                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                    check=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW
-                )
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                pass # プロセスが既に存在しない等のエラーは無視
-        
+                parent = psutil.Process(pid)
+                children = parent.children(recursive=True)
+                for child in children:
+                    child.kill()
+                parent.kill()
+            except psutil.NoSuchProcess:
+                pass # プロセスが既に存在しない場合は無視
+            except Exception as e:
+                print(f"プロセス {pid} の終了に失敗: {e}") # デバッグ用
+
         for app in self.app_status.get(tab_name, []):
             if app['status'] == '起動中':
                 app['status'] = 'タイマー終了'

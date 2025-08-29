@@ -2,3 +2,4 @@ tkinterdnd2
 pystray
 Pillow
 pylnk3
+psutil
