@@ -190,8 +190,6 @@ class AppLauncher(TkinterDnD.Tk):
         self._refresh_tab_buttons(tab_name)
 
     def _run_single_app(self, app_path, tab_name):
-        if tab_name not in self.running_processes:
-            self.running_processes[tab_name] = []
         if tab_name not in self.app_status:
             self.app_status[tab_name] = []
 
@@ -201,16 +199,15 @@ class AppLauncher(TkinterDnD.Tk):
                 link = pylnk3.Lnk(app_path)
                 target_path = link.path
             
-            # 起動時の情報をapp_statusに保存
-            proc = subprocess.Popen([target_path])
+            subprocess.Popen([target_path])
+            # Popenオブジェクトは保存せず、ステータスのみ更新
             self.app_status[tab_name].append({
                 'name': app_path, 
-                'proc': proc, 
                 'status': '起動中',
-                'target_path': target_path # 解決後のパスも保存
+                'target_path': target_path
             })
         except Exception as e:
-            self.app_status[tab_name].append({'name': app_path, 'proc': None, 'status': f'起動失敗: {e}', 'target_path': None})
+            self.app_status[tab_name].append({'name': app_path, 'status': f'起動失敗: {e}', 'target_path': None})
         self._update_status_table()
 
     def _kill_apps_in_tab(self, tab_name):
@@ -240,22 +237,29 @@ class AppLauncher(TkinterDnD.Tk):
         for app in self.app_status.get(tab_name, []):
             if app['status'] == '起動中':
                 app['status'] = 'タイマー終了'
-        # running_processesは使わないのでクリア
-        self.running_processes[tab_name] = []
 
     def _update_status_table(self):
         if not self.status_tree:
             return
+
+        try:
+            running_exe_paths = {os.path.normcase(p.info['exe']) for p in psutil.process_iter(['exe']) if p.info['exe']}
+        except Exception:
+            running_exe_paths = set() # psutilでエラーが起きてもUIが止まらないように
+
+        for tab, apps in self.app_status.items():
+            for app_status in apps:
+                if app_status['status'] == '起動中':
+                    target_path = app_status.get('target_path')
+                    if not target_path or os.path.normcase(target_path) not in running_exe_paths:
+                        app_status['status'] = 'ユーザー終了'
+
         for item in self.status_tree.get_children():
             self.status_tree.delete(item)
         
         combined_list = []
         for tab, apps in self.app_status.items():
             for a in apps:
-                # Popenオブジェクトが終了しているか確認
-                if a.get('proc') and a['status'] == '起動中':
-                    if a['proc'].poll() is not None:
-                        a['status'] = 'ユーザー終了'
                 combined_list.append({'tab': tab, 'name': a['name'], 'status': a['status']})
         
         combined_list.sort(key=lambda x: (x['status'] != '起動中', x['status'] != 'タイマー終了', x['status'] != 'ユーザー終了'))
@@ -280,7 +284,6 @@ class AppLauncher(TkinterDnD.Tk):
             messagebox.showinfo("確認", f"{tab_name}のタイマーは既に実行中です。")
             return
         
-        # 起動中のアプリがあるかチェック
         is_running = any(app['status'] == '起動中' for app in self.app_status.get(tab_name, []))
         if not is_running:
             messagebox.showinfo("確認", f"{tab_name}で起動中のアプリがありません。先にアプリを起動してください。")
