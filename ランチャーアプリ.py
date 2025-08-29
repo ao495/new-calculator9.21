@@ -12,11 +12,12 @@ import pylnk3
 import psutil
 
 APP_JSON = "apps.json"
+APP_TITLE = "起動順＆一括タイマーランチャー"
 
 class AppLauncher(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
-        self.title("起動順＆一括タイマーランチャー")
+        self.title(APP_TITLE)
         self.geometry("700x500")
 
         # --- データ管理 ---
@@ -200,7 +201,6 @@ class AppLauncher(TkinterDnD.Tk):
                 target_path = link.path
             
             subprocess.Popen([target_path])
-            # Popenオブジェクトは保存せず、ステータスのみ更新
             self.app_status[tab_name].append({
                 'name': app_path, 
                 'status': '起動中',
@@ -245,7 +245,7 @@ class AppLauncher(TkinterDnD.Tk):
         try:
             running_exe_paths = {os.path.normcase(p.info['exe']) for p in psutil.process_iter(['exe']) if p.info['exe']}
         except Exception:
-            running_exe_paths = set() # psutilでエラーが起きてもUIが止まらないように
+            running_exe_paths = set()
 
         for tab, apps in self.app_status.items():
             for app_status in apps:
@@ -273,6 +273,9 @@ class AppLauncher(TkinterDnD.Tk):
     # -----------------------------
     # タイマーとトレイ関連
     # -----------------------------
+    def _show_window(self):
+        self.deiconify()
+
     def _create_tray_image(self, color="blue"):
         img = Image.new('RGB', (64, 64), 'white')
         d = ImageDraw.Draw(img)
@@ -292,9 +295,11 @@ class AppLauncher(TkinterDnD.Tk):
         seconds = simpledialog.askinteger("タブタイマー", f"{tab_name} タブの全アプリ終了までの時間（秒）:", minvalue=1)
         if seconds and seconds > 0:
             threading.Thread(target=self._start_timer_thread, args=(tab_name, seconds), daemon=True).start()
+            self.withdraw()
 
     def _start_timer_thread(self, tab_name, seconds):
-        icon = pystray.Icon(tab_name, self._create_tray_image("blue"), f"{tab_name} タイマー")
+        menu = pystray.Menu(pystray.MenuItem('再表示', self._show_window))
+        icon = pystray.Icon(tab_name, self._create_tray_image("blue"), f"{tab_name} タイマー", menu=menu)
         self.tab_tray_icons[tab_name] = icon
         
         threading.Thread(target=icon.run, daemon=True).start()
@@ -310,6 +315,10 @@ class AppLauncher(TkinterDnD.Tk):
             
             seconds = self.tab_timers[tab_name]
             mins, secs = divmod(seconds, 60)
+            
+            title_text = f"残り: {mins:02d}:{secs:02d} - {APP_TITLE}"
+            self.title(title_text)
+
             if self.tab_tray_icons.get(tab_name):
                 self.tab_tray_icons[tab_name].title = f"{tab_name} 残り: {mins:02d}:{secs:02d}"
 
@@ -324,6 +333,8 @@ class AppLauncher(TkinterDnD.Tk):
                 self.tab_tray_icons[tab_name].stop()
                 del self.tab_tray_icons[tab_name]
             self._kill_apps_in_tab(tab_name)
+            self.title(APP_TITLE)
+            self.deiconify()
             self._update_status_table()
             messagebox.showinfo("タイマー終了", f"{tab_name} のタイマーが終了しました。")
 
