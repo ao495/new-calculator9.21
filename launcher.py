@@ -403,10 +403,18 @@ class AppLauncher(TkinterDnD.Tk):
             messagebox.showinfo("確認", f"{tab_name}で起動中のアプリがありません。先にアプリを起動してください。")
             return
 
-        seconds = simpledialog.askinteger("タブタイマー", f"{tab_name} タブの全アプリ終了までの時間（秒）:", minvalue=1)
-        if seconds and seconds > 0:
-            threading.Thread(target=self._start_timer_thread, args=(tab_name, seconds), daemon=True).start()
+        # 時間、分、秒を入力させる
+        minutes = simpledialog.askinteger("タブタイマー", f"{tab_name} タブの全アプリ終了までの時間（分）:", minvalue=0, initialvalue=0)
+        if minutes is None: # キャンセルされた場合
+            return
+
+        total_seconds = minutes * 60
+
+        if total_seconds > 0:
+            threading.Thread(target=self._start_timer_thread, args=(tab_name, total_seconds), daemon=True).start()
             self.withdraw()
+        else:
+            messagebox.showinfo("確認", "タイマー時間は1秒以上に設定してください。")
 
     def _start_timer_thread(self, tab_name, seconds):
         menu = pystray.Menu(pystray.MenuItem('再表示', self._show_window))
@@ -425,13 +433,13 @@ class AppLauncher(TkinterDnD.Tk):
             self.tab_timers[tab_name] -= 1
             
             seconds = self.tab_timers[tab_name]
-            mins, secs = divmod(seconds, 60)
+            mins = seconds // 60 # Only minutes are needed
             
-            title_text = f"残り: {mins:02d}:{secs:02d} - {APP_TITLE}"
+            title_text = f"残り: {mins:02d}分 - {APP_TITLE}"
             self.title(title_text)
 
             if self.tab_tray_icons.get(tab_name):
-                self.tab_tray_icons[tab_name].title = f"{tab_name} 残り: {mins:02d}:{secs:02d}"
+                self.tab_tray_icons[tab_name].title = f"{tab_name} 残り: {mins:02d}分"
 
             self.after(1000, lambda: self._timer_countdown(tab_name))
         else:
