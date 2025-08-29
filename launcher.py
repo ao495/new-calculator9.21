@@ -44,17 +44,25 @@ class AppLauncher(TkinterDnD.Tk):
         try:
             if os.path.exists(APP_JSON):
                 with open(APP_JSON, "r", encoding="utf-8") as f:
-                    self.app_groups = json.load(f)
+                    data = json.load(f)
+                    self.app_groups = data.get("app_groups", {})
+                    self.last_active_tab = data.get("last_active_tab")
             else:
                 self.app_groups = {}
+                self.last_active_tab = None
         except (json.JSONDecodeError, TypeError) as e:
             messagebox.showerror("エラー", f"設定ファイル({APP_JSON})の読み込みに失敗しました。\n{e}")
             self.app_groups = {}
+            self.last_active_tab = None
 
     def _save_apps(self):
         try:
+            data = {
+                "app_groups": self.app_groups,
+                "last_active_tab": self.last_active_tab
+            }
             with open(APP_JSON, "w", encoding="utf-8") as f:
-                json.dump(self.app_groups, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             messagebox.showerror("エラー", f"設定ファイル({APP_JSON})の保存に失敗しました。\n{e}")
 
@@ -80,6 +88,18 @@ class AppLauncher(TkinterDnD.Tk):
         btn_add_tab.pack(side="top", anchor="ne", padx=5, pady=5)
 
         self.tab_control.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+
+        # 最後に使用していたタブを選択
+        if self.last_active_tab and self.last_active_tab in self.tabs:
+            self.tab_control.select(self.tabs[self.last_active_tab])
+        else:
+            # デフォルトで最初のタブを選択（「起動中一覧」以外）
+            if self.tab_control.tabs():
+                first_tab_id = self.tab_control.tabs()[0]
+                if self.tab_control.tab(first_tab_id, "text") == "起動中一覧" and len(self.tab_control.tabs()) > 1:
+                    self.tab_control.select(self.tab_control.tabs()[1])
+                else:
+                    self.tab_control.select(first_tab_id)
 
     def _create_app_tab(self, name):
         frame = tk.Frame(self.tab_control)
@@ -170,8 +190,15 @@ class AppLauncher(TkinterDnD.Tk):
     def _on_tab_changed(self, event):
         try:
             selected_tab_name = self.tab_control.tab(self.tab_control.select(), "text")
+            self.last_active_tab = selected_tab_name # 最後にアクティブだったタブを保存
+            self._save_apps() # 設定を保存
+
+            # 「起動中一覧」タブが選択された時のみ更新
+            if selected_tab_name == "起動中一覧":
+                self._update_status_table()
         except tk.TclError:
-            return
+            pass # ウィジェット破棄中のエラーを無視
+
         for tab_name, tray_icon in self.tab_tray_icons.items():
             if self.tab_running_flags.get(tab_name, False):
                 color = "green" if tab_name == selected_tab_name else "blue"
@@ -324,7 +351,8 @@ class AppLauncher(TkinterDnD.Tk):
             self.status_tree.insert('', 'end', values=(app['tab'], display_name, app['status']))
 
     def _periodic_update(self):
-        self._update_status_table()
+        # _update_status_table() は _on_tab_changed でのみ呼び出す
+        # self._update_status_table()
         self.after(1000, self._periodic_update)
 
     # -----------------------------
