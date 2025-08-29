@@ -13,6 +13,7 @@ import psutil
 
 APP_JSON = "apps.json"
 APP_TITLE = "起動順＆一括タイマーランチャー"
+FOLDER_PREFIX = "folder:"
 
 class AppLauncher(TkinterDnD.Tk):
     def __init__(self):
@@ -114,8 +115,16 @@ class AppLauncher(TkinterDnD.Tk):
     def _add_app_button(self, parent_frame, tab_name, app_path):
         btn_frame = tk.Frame(parent_frame)
         
-        btn = tk.Button(btn_frame, text=os.path.basename(app_path), width=30, anchor='w',
-                        command=lambda p=app_path, t=tab_name: self._run_single_app(p, t))
+        display_name = os.path.basename(app_path)
+        command_func = lambda p=app_path, t=tab_name: self._run_single_app(p, t)
+
+        if app_path.startswith(FOLDER_PREFIX):
+            folder_path = app_path[len(FOLDER_PREFIX):]
+            display_name = os.path.basename(folder_path) + " (フォルダ)"
+            command_func = lambda p=folder_path: self._open_folder(p)
+
+        btn = tk.Button(btn_frame, text=display_name, width=30, anchor='w',
+                        command=command_func)
         btn.pack(side="left", fill="x", expand=True)
         
         btn.bind("<Button-3>", lambda e, n=tab_name, a=app_path, b=btn_frame: self._on_app_right_click(e, n, a, b))
@@ -176,16 +185,24 @@ class AppLauncher(TkinterDnD.Tk):
                     self.app_groups[tab_name] = []
                 self.app_groups[tab_name].append(f)
                 self._add_app_button(scroll_frame, tab_name, f)
+            elif os.path.isdir(f): # フォルダの場合
+                if tab_name not in self.app_groups:
+                    self.app_groups[tab_name] = []
+                self.app_groups[tab_name].append(FOLDER_PREFIX + f) # プレフィックスを付けて登録
+                self._add_app_button(scroll_frame, tab_name, FOLDER_PREFIX + f)
         self._save_apps()
 
     def _on_app_right_click(self, event, tab_name, app_path, btn_frame):
         menu = tk.Menu(self, tearoff=0)
         menu.add_command(label="削除", command=lambda: self._delete_app(tab_name, app_path, btn_frame))
-        index = self.app_groups[tab_name].index(app_path)
-        if index > 0:
-            menu.add_command(label="↑上に移動", command=lambda: self._move_app(tab_name, index, -1))
-        if index < len(self.app_groups[tab_name]) - 1:
-            menu.add_command(label="↓下に移動", command=lambda: self._move_app(tab_name, index, 1))
+        
+        # フォルダの場合は移動メニューを表示しない
+        if not app_path.startswith(FOLDER_PREFIX):
+            index = self.app_groups[tab_name].index(app_path)
+            if index > 0:
+                menu.add_command(label="↑上に移動", command=lambda: self._move_app(tab_name, index, -1))
+            if index < len(self.app_groups[tab_name]) - 1:
+                menu.add_command(label="↓下に移動", command=lambda: self._move_app(tab_name, index, 1))
         menu.post(event.x_root, event.y_root)
 
     # -----------------------------
@@ -241,6 +258,12 @@ class AppLauncher(TkinterDnD.Tk):
             self.app_status[tab_name].append({'name': app_path, 'status': f'起動失敗: {e}', 'target_path': None})
         self._update_status_table()
 
+    def _open_folder(self, folder_path):
+        try:
+            subprocess.Popen(['explorer', folder_path])
+        except Exception as e:
+            messagebox.showerror("エラー", f"フォルダを開けませんでした: {e}")
+
     def _kill_apps_in_tab(self, tab_name):
         apps_to_kill = [
             app for app in self.app_status.get(tab_name, []) 
@@ -295,7 +318,10 @@ class AppLauncher(TkinterDnD.Tk):
         
         combined_list.sort(key=lambda x: (x['status'] != '起動中', x['status'] != 'タイマー終了', x['status'] != 'ユーザー終了'))
         for app in combined_list:
-            self.status_tree.insert('', 'end', values=(app['tab'], os.path.basename(app['name']), app['status']))
+            display_name = os.path.basename(app['name'])
+            if app['name'].startswith(FOLDER_PREFIX):
+                display_name = os.path.basename(app['name'][len(FOLDER_PREFIX):]) + " (フォルダ)"
+            self.status_tree.insert('', 'end', values=(app['tab'], display_name, app['status']))
 
     def _periodic_update(self):
         self._update_status_table()
