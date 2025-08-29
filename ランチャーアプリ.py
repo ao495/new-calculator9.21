@@ -75,7 +75,7 @@ class AppLauncher(TkinterDnD.Tk):
         self.tab_control.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
     def _create_app_tab(self, name):
-        frame = tk.Frame(self.tab_control) # tk.Frameを使用
+        frame = tk.Frame(self.tab_control)
         self.tabs[name] = frame
         
         # 「起動中一覧」タブの直前に挿入
@@ -99,7 +99,7 @@ class AppLauncher(TkinterDnD.Tk):
         canvas.dnd_bind('<<Drop>>', lambda e, n=name, f=scroll_frame: self._on_drop_app(e, n, f))
 
     def _create_status_tab(self):
-        status_tab = tk.Frame(self.tab_control) # tk.Frameを使用
+        status_tab = tk.Frame(self.tab_control)
         self.tab_control.add(status_tab, text="起動中一覧")
         cols = ('グループ名', 'アプリ名', '状態')
         self.status_tree = ttk.Treeview(status_tab, columns=cols, show='headings')
@@ -194,7 +194,8 @@ class AppLauncher(TkinterDnD.Tk):
         self.app_status[tab_name] = []
         for app_path in self.app_groups.get(tab_name, []):
             try:
-                proc = subprocess.Popen(app_path)
+                # パスをリストで渡すように修正
+                proc = subprocess.Popen([app_path])
                 self.running_processes[tab_name].append(proc)
                 self.app_status[tab_name].append({'name': app_path, 'proc': proc, 'status': '起動中'})
             except Exception as e:
