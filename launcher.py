@@ -70,6 +70,21 @@ class AppLauncher(TkinterDnD.Tk):
     # UI構築
     # -----------------------------
     def _setup_ui(self):
+        # ボタン配置用のフレーム
+        button_frame = tk.Frame(self)
+        button_frame.pack(side="top", fill="x", padx=5, pady=5)
+
+        # button_frame の grid 設定
+        button_frame.grid_columnconfigure(0, weight=1) # 左側のカラムを広げる
+        button_frame.grid_columnconfigure(1, weight=0) # タイマーボタンのカラムは固定
+        button_frame.grid_columnconfigure(2, weight=0) # タブ追加ボタンのカラムは固定
+
+        btn_timer_main = tk.Button(button_frame, text="タイマー付き一括終了", command=self._set_tab_timer_main)
+        btn_timer_main.grid(row=0, column=1, padx=5) # column=1 に配置
+
+        btn_add_tab = tk.Button(button_frame, text="+ タブ追加", command=self._add_new_tab)
+        btn_add_tab.grid(row=0, column=2, padx=5) # column=2 に配置
+
         self.tab_control = ttk.Notebook(self)
         self.tab_control.pack(expand=1, fill='both')
 
@@ -83,9 +98,6 @@ class AppLauncher(TkinterDnD.Tk):
         app_tab_names = [name for name in self.app_groups.keys() if name != '起動中一覧']
         for name in app_tab_names:
             self._create_app_tab(name)
-
-        btn_add_tab = tk.Button(self, text="+ タブ追加", command=self._add_new_tab)
-        btn_add_tab.pack(side="top", anchor="ne", padx=5, pady=5)
 
         self.tab_control.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
@@ -359,6 +371,16 @@ class AppLauncher(TkinterDnD.Tk):
     # -----------------------------
     # タイマーとトレイ関連
     # -----------------------------
+    def _set_tab_timer_main(self):
+        try:
+            selected_tab_name = self.tab_control.tab(self.tab_control.select(), "text")
+            if selected_tab_name == "起動中一覧":
+                messagebox.showinfo("確認", "「起動中一覧」タブではタイマーを設定できません。")
+                return
+            self._set_tab_timer(selected_tab_name)
+        except tk.TclError:
+            messagebox.showinfo("確認", "有効なタブが選択されていません。")
+
     def _show_window(self):
         self.deiconify()
 
