@@ -1,9 +1,10 @@
 {
-  "普段使い": [
-    "C:/Users/kuron/OneDrive/Desktop/app/Microsoft Edge.lnk",
-    "folder:C:/Users/kuron/OneDrive/Desktop/app/syougi"
-  ],
-  "趣味": [
-    "C:/Users/kuron/OneDrive/Desktop/app/Microsoft Edge.lnk"
-  ]
+  "app_groups": {
+    "mein": [
+      "C:/Users/kuron/OneDrive/Desktop/app/Google Chrome.lnk",
+      "folder:C:/Users/kuron/OneDrive/Desktop/app/syougi",
+      "folder:C:/Users/kuron/OneDrive/Desktop/app/quality-work"
+    ]
+  },
+  "last_active_tab": "mein"
 }
