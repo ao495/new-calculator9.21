@@ -1,236 +1,293 @@
 import tkinter as tk
-from tkinter import simpledialog, ttk
+from tkinter import simpledialog, ttk, messagebox
 from tkinterdnd2 import DND_FILES, TkinterDnD
-import threading, subprocess, time, json, os
+import threading
+import subprocess
+import time
+import json
+import os
 import pystray
 from PIL import Image, ImageDraw
 
 APP_JSON = "apps.json"
 
-# -----------------------------
-# データ管理
-# -----------------------------
-app_groups = {}
-running_processes = {}
-app_status = {}
-tab_timers = {}
-tab_running_flags = {}
-tab_tray_icons = {}
-status_trees = {}
-tabs = {}
+class AppLauncher(TkinterDnD.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("起動順＆一括タイマーランチャー")
+        self.geometry("700x500")
 
-def load_apps():
-    global app_groups
-    if os.path.exists(APP_JSON):
-        with open(APP_JSON, "r", encoding="utf-8") as f:
-            app_groups = json.load(f)
-    else:
-        app_groups = {}
+        # --- データ管理 ---
+        self.app_groups = {}
+        self.running_processes = {}
+        self.app_status = {}
+        self.tab_timers = {}
+        self.tab_running_flags = {}
+        self.tab_tray_icons = {}
+        self.status_tree = None
+        self.tabs = {}
+        self.tab_control = None
 
-def save_apps():
-    with open(APP_JSON, "w", encoding="utf-8") as f:
-        json.dump(app_groups, f, ensure_ascii=False, indent=2)
+        # --- 初期化 ---
+        self._load_apps()
+        self._setup_ui()
+        self._periodic_update()
 
-# -----------------------------
-# トレイ・タイマー関連
-# -----------------------------
-def create_image(color="blue"):
-    img = Image.new('RGB', (16,16), color='white')
-    d = ImageDraw.Draw(img)
-    d.rectangle([0,0,15,15], fill=color)
-    return img
-
-def update_tray(tab_name):
-    tray_icon = tab_tray_icons[tab_name]
-    while tab_running_flags.get(tab_name, False):
-        seconds = tab_timers.get(tab_name,0)
-        mins, secs = divmod(seconds, 60)
-        tray_icon.title = f"{tab_name} 残り時間: {mins:02}:{secs:02}"
-        time.sleep(1)
-
-def kill_apps(tab_name):
-    for proc in running_processes.get(tab_name, []):
-        try: proc.terminate()
-        except: pass
-    for app in app_status.get(tab_name, []):
-        if app['status'] == '起動中': app['status'] = 'タイマー終了'
-    running_processes[tab_name] = []
-
-def start_timer(tab_name, seconds):
-    tray_icon = pystray.Icon(tab_name, create_image("blue"), f"{tab_name} タイマー")
-    tab_tray_icons[tab_name] = tray_icon
-    threading.Thread(target=tray_icon.run, daemon=True).start()
-
-    tab_timers[tab_name] = seconds
-    tab_running_flags[tab_name] = True
-    threading.Thread(target=update_tray, args=(tab_name,), daemon=True).start()
-
-    while tab_timers[tab_name] > 0 and tab_running_flags[tab_name]:
-        time.sleep(1)
-        tab_timers[tab_name] -= 1
-        update_status_table()
-
-    tab_running_flags[tab_name] = False
-    tray_icon.visible = False
-    kill_apps(tab_name)
-    update_status_table()
-
-def set_tab_timer(tab_name):
-    seconds = simpledialog.askinteger("タブタイマー", f"{tab_name} タブの全アプリ終了までの時間（秒）:")
-    if seconds:
-        threading.Thread(target=start_timer, args=(tab_name, seconds), daemon=True).start()
-
-# -----------------------------
-# アプリ起動・状態管理
-# -----------------------------
-def run_apps(tab_name):
-    running_processes[tab_name] = []
-    app_status[tab_name] = []
-    for app in app_groups[tab_name]:
+    # -----------------------------
+    # データ永続化
+    # -----------------------------
+    def _load_apps(self):
         try:
-            proc = subprocess.Popen(app)
-            running_processes[tab_name].append(proc)
-            app_status[tab_name].append({'name': app, 'proc': proc, 'status': '起動中'})
+            if os.path.exists(APP_JSON):
+                with open(APP_JSON, "r", encoding="utf-8") as f:
+                    self.app_groups = json.load(f)
+            else:
+                self.app_groups = {}
+        except (json.JSONDecodeError, TypeError) as e:
+            messagebox.showerror("エラー", f"設定ファイル({APP_JSON})の読み込みに失敗しました。\n{e}")
+            self.app_groups = {}
+
+    def _save_apps(self):
+        try:
+            with open(APP_JSON, "w", encoding="utf-8") as f:
+                json.dump(self.app_groups, f, ensure_ascii=False, indent=2)
         except Exception as e:
-            app_status[tab_name].append({'name': app, 'proc': None, 'status': f'起動失敗: {e}'})
-    update_status_table()
+            messagebox.showerror("エラー", f"設定ファイル({APP_JSON})の保存に失敗しました。\n{e}")
 
-def update_status_table():
-    for tree in status_trees.values():
-        for item in tree.get_children(): tree.delete(item)
-    combined_list = []
-    for tab, apps in app_status.items():
-        for a in apps:
-            if a['proc'] and a['status'] == '起動中':
-                if a['proc'].poll() is not None: a['status'] = 'ユーザー終了'
-            combined_list.append({'tab': tab, 'name': a['name'], 'status': a['status']})
-    combined_list.sort(key=lambda x: x['status'] != '起動中')
-    for app in combined_list:
-        status_trees['起動中一覧'].insert('', 'end', values=(app['tab'], app['name'], app['status']))
+    # -----------------------------
+    # UI構築
+    # -----------------------------
+    def _setup_ui(self):
+        self.tab_control = ttk.Notebook(self)
+        self.tab_control.pack(expand=1, fill='both')
 
-def on_tab_changed(event):
-    selected_tab = tab_control.tab(tab_control.select(), "text")
-    for tab_name, tray_icon in tab_tray_icons.items():
-        if tab_running_flags.get(tab_name, False):
-            color = "green" if tab_name == selected_tab else "blue"
-            tray_icon.icon = create_image(color)
+        # アプリタブを先に追加
+        app_tab_names = [name for name in self.app_groups.keys() if name != '起動中一覧']
+        for name in app_tab_names:
+            self._create_app_tab(name)
 
-# -----------------------------
-# ドラッグ＆ドロップ登録
-# -----------------------------
-def drop_app(event, tab_name, scroll_frame):
-    files = root.tk.splitlist(event.data)
-    for f in files:
-        if os.path.isfile(f):
-            app_groups[tab_name].append(f)
-            save_apps()
-            add_app_button(scroll_frame, tab_name, f)
+        # 最後に固定タブを追加
+        self._create_status_tab()
 
-def add_app_button(frame, tab_name, app_path):
-    btn = tk.Button(frame, text=os.path.basename(app_path), width=20,
-                    command=lambda a=app_path, n=tab_name: run_apps(n))
-    btn.bind("<Button-3>", lambda e, n=tab_name, a=app_path, b=btn: on_app_right_click(e,n,a,b))
-    row = len([w for w in frame.grid_slaves() if isinstance(w, tk.Button)]) // 3
-    col = len([w for w in frame.grid_slaves() if isinstance(w, tk.Button)]) % 3
-    btn.grid(row=row, column=col, padx=5, pady=5)
+        btn_add_tab = tk.Button(self, text="+ タブ追加", command=self._add_new_tab)
+        btn_add_tab.pack(side="top", anchor="ne", padx=5, pady=5)
 
-def on_app_right_click(event, tab_name, app_path, btn):
-    menu = tk.Menu(root, tearoff=0)
-    menu.add_command(label="削除", command=lambda: delete_app(tab_name, app_path, btn))
-    index = app_groups[tab_name].index(app_path)
-    menu.add_command(label="↑上に移動", command=lambda: move_app_up(tab_name, index))
-    menu.add_command(label="↓下に移動", command=lambda: move_app_down(tab_name, index))
-    menu.post(event.x_root, event.y_root)
+        self.tab_control.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
-def delete_app(tab_name, app_path, btn):
-    if app_path in app_groups[tab_name]:
-        app_groups[tab_name].remove(app_path)
-        save_apps()
-        btn.destroy()
-        refresh_tab_buttons(tab_name)
+    def _create_app_tab(self, name):
+        frame = ttk.Frame(self.tab_control)
+        self.tabs[name] = frame
+        # 常に末尾から2番目（「起動中一覧」タブの前）に挿入
+        self.tab_control.insert(self.tab_control.index('end') -1, frame, text=name)
 
-def move_app_up(tab_name, index):
-    if index > 0:
-        app_groups[tab_name][index-1], app_groups[tab_name][index] = app_groups[tab_name][index], app_groups[tab_name][index-1]
-        save_apps()
-        refresh_tab_buttons(tab_name)
+        canvas = tk.Canvas(frame)
+        scrollbar = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        scroll_frame = tk.Frame(canvas)
+        scroll_frame.bind("<Configure>", lambda e, c=canvas: c.configure(scrollregion=c.bbox("all")))
+        canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
-def move_app_down(tab_name, index):
-    if index < len(app_groups[tab_name]) - 1:
-        app_groups[tab_name][index+1], app_groups[tab_name][index] = app_groups[tab_name][index], app_groups[tab_name][index+1]
-        save_apps()
-        refresh_tab_buttons(tab_name)
+        self._refresh_tab_buttons(name)
 
-def refresh_tab_buttons(tab_name):
-    frame = tabs[tab_name]
-    scroll_frame = frame.winfo_children()[0].winfo_children()[0]
-    for w in scroll_frame.winfo_children():
-        if isinstance(w, tk.Button): w.destroy()
-    for app in app_groups[tab_name]:
-        add_app_button(scroll_frame, tab_name, app)
-    btn_timer = tk.Button(scroll_frame, text="タイマー付き終了", command=lambda n=tab_name: set_tab_timer(n))
-    btn_timer.grid(row=1000, column=0, columnspan=3, pady=5)
+        scroll_frame.drop_target_register(DND_FILES)
+        scroll_frame.dnd_bind('<<Drop>>', lambda e, n=name: self._on_drop_app(e, n))
 
-# -----------------------------
-# タブ管理
-# -----------------------------
-def add_new_tab():
-    name = simpledialog.askstring("新規タブ", "タブ名を入力:")
-    if name and name not in app_groups:
-        app_groups[name] = []
-        save_apps()
-        create_tab(name)
+    def _create_status_tab(self):
+        status_tab = ttk.Frame(self.tab_control)
+        self.tab_control.add(status_tab, text="起動中一覧")
+        cols = ('グループ名', 'アプリ名', '状態')
+        self.status_tree = ttk.Treeview(status_tab, columns=cols, show='headings')
+        for c in cols:
+            self.status_tree.heading(c, text=c)
+        self.status_tree.pack(expand=1, fill='both')
 
-def create_tab(name):
-    frame = ttk.Frame(tab_control)
-    tabs[name] = frame
-    tab_control.add(frame, text=name)
+    def _add_app_button(self, parent_frame, tab_name, app_path):
+        btn_frame = tk.Frame(parent_frame)
+        
+        btn = tk.Button(btn_frame, text=os.path.basename(app_path), width=30, anchor='w',
+                        command=lambda t=tab_name: self._run_apps_in_tab(t))
+        btn.pack(side="left", fill="x", expand=True)
+        
+        btn.bind("<Button-3>", lambda e, n=tab_name, a=app_path, b=btn_frame: self._on_app_right_click(e, n, a, b))
+        btn_frame.pack(fill='x', padx=5, pady=2)
 
-    canvas = tk.Canvas(frame)
-    scrollbar = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
-    scroll_frame = tk.Frame(canvas)
-    scroll_frame.bind("<Configure>", lambda e, c=canvas: c.configure(scrollregion=c.bbox("all")))
-    canvas.create_window((0,0), window=scroll_frame, anchor="nw")
-    canvas.configure(yscrollcommand=scrollbar.set)
-    canvas.pack(side="left", fill="both", expand=True)
-    scrollbar.pack(side="right", fill="y")
+    def _refresh_tab_buttons(self, tab_name):
+        frame = self.tabs[tab_name]
+        # scroll_frame の取得をより堅牢に
+        try:
+            scroll_frame = frame.winfo_children()[0].winfo_children()[0]
+        except IndexError:
+            return # まだUIが構築されていない場合は何もしない
+            
+        for w in scroll_frame.winfo_children():
+            w.destroy()
+        for app in self.app_groups.get(tab_name, []):
+            self._add_app_button(scroll_frame, tab_name, app)
+        
+        btn_timer = tk.Button(scroll_frame, text="タイマー付き一括終了", command=lambda n=tab_name: self._set_tab_timer(n))
+        btn_timer.pack(pady=10)
 
-    for app in app_groups[name]:
-        add_app_button(scroll_frame, name, app)
+    # -----------------------------
+    # イベントハンドラ
+    # -----------------------------
+    def _on_tab_changed(self, event):
+        try:
+            selected_tab_name = self.tab_control.tab(self.tab_control.select(), "text")
+        except tk.TclError:
+            return # ウィジェット破棄中のエラーを無視
+        for tab_name, tray_icon in self.tab_tray_icons.items():
+            if self.tab_running_flags.get(tab_name, False):
+                color = "green" if tab_name == selected_tab_name else "blue"
+                tray_icon.icon = self._create_tray_image(color)
 
-    btn_timer = tk.Button(scroll_frame, text="タイマー付き終了", command=lambda n=name: set_tab_timer(n))
-    btn_timer.grid(row=1000, column=0, columnspan=3, pady=5)
+    def _on_drop_app(self, event, tab_name):
+        files = self.tk.splitlist(event.data)
+        for f in files:
+            if os.path.isfile(f):
+                if tab_name not in self.app_groups:
+                    self.app_groups[tab_name] = []
+                self.app_groups[tab_name].append(f)
+        self._save_apps()
+        self._refresh_tab_buttons(tab_name)
 
-    scroll_frame.drop_target_register(DND_FILES)
-    scroll_frame.dnd_bind('<<Drop>>', lambda e, n=name, f=scroll_frame: drop_app(e,n,f))
+    def _on_app_right_click(self, event, tab_name, app_path, btn_frame):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="削除", command=lambda: self._delete_app(tab_name, app_path, btn_frame))
+        index = self.app_groups[tab_name].index(app_path)
+        if index > 0:
+            menu.add_command(label="↑上に移動", command=lambda: self._move_app(tab_name, index, -1))
+        if index < len(self.app_groups[tab_name]) - 1:
+            menu.add_command(label="↓下に移動", command=lambda: self._move_app(tab_name, index, 1))
+        menu.post(event.x_root, event.y_root)
 
-# -----------------------------
-# GUI構築
-# -----------------------------
-load_apps()
-root = TkinterDnD.Tk()
-root.title("起動順＆一括タイマーランチャー")
-root.geometry("700x500")
+    # -----------------------------
+    # アプリケーションロジック
+    # -----------------------------
+    def _add_new_tab(self):
+        name = simpledialog.askstring("新規タブ", "タブ名を入力:")
+        if name and name not in self.app_groups:
+            self.app_groups[name] = []
+            self._save_apps()
+            self._create_app_tab(name)
 
-tab_control = ttk.Notebook(root)
-tab_control.pack(expand=1, fill='both')
+    def _delete_app(self, tab_name, app_path, btn_frame):
+        if messagebox.askyesno("確認", f"{os.path.basename(app_path)}を削除しますか？"):
+            if app_path in self.app_groups.get(tab_name, []):
+                self.app_groups[tab_name].remove(app_path)
+                self._save_apps()
+                btn_frame.destroy()
 
-for name in app_groups.keys():
-    create_tab(name)
+    def _move_app(self, tab_name, index, direction):
+        apps = self.app_groups[tab_name]
+        new_index = index + direction
+        apps[index], apps[new_index] = apps[new_index], apps[index]
+        self._save_apps()
+        self._refresh_tab_buttons(tab_name)
 
-btn_add_tab = tk.Button(root, text="+ タブ追加", command=add_new_tab)
-btn_add_tab.pack(side="top", anchor="ne", padx=5, pady=5)
+    def _run_apps_in_tab(self, tab_name):
+        self.running_processes[tab_name] = []
+        self.app_status[tab_name] = []
+        for app_path in self.app_groups.get(tab_name, []):
+            try:
+                proc = subprocess.Popen(app_path)
+                self.running_processes[tab_name].append(proc)
+                self.app_status[tab_name].append({'name': app_path, 'proc': proc, 'status': '起動中'})
+            except Exception as e:
+                self.app_status[tab_name].append({'name': app_path, 'proc': None, 'status': f'起動失敗: {e}'})
+        self._update_status_table()
 
-status_tab = ttk.Frame(tab_control)
-tab_control.add(status_tab, text="起動中一覧")
-cols = ('グループ名','アプリ名','状態')
-tree = ttk.Treeview(status_tab, columns=cols, show='headings')
-for c in cols: tree.heading(c,text=c)
-tree.pack(expand=1, fill='both')
-status_trees['起動中一覧'] = tree
+    def _kill_apps_in_tab(self, tab_name):
+        for proc in self.running_processes.get(tab_name, []):
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+        for app in self.app_status.get(tab_name, []):
+            if app['status'] == '起動中':
+                app['status'] = 'タイマー終了'
+        self.running_processes[tab_name] = []
 
-tab_control.bind("<<NotebookTabChanged>>", lambda e: on_tab_changed(e))
-root.after(1000, lambda: periodic_update())
-def periodic_update(): update_status_table(); root.after(1000, periodic_update)
+    def _update_status_table(self):
+        if not self.status_tree:
+            return
+        for item in self.status_tree.get_children():
+            self.status_tree.delete(item)
+        
+        combined_list = []
+        for tab, apps in self.app_status.items():
+            for a in apps:
+                if a.get('proc') and a['status'] == '起動中':
+                    if a['proc'].poll() is not None:
+                        a['status'] = 'ユーザー終了'
+                combined_list.append({'tab': tab, 'name': a['name'], 'status': a['status']})
+        
+        combined_list.sort(key=lambda x: (x['status'] != '起動中', x['status'] != 'タイマー終了'))
+        for app in combined_list:
+            self.status_tree.insert('', 'end', values=(app['tab'], os.path.basename(app['name']), app['status']))
 
-root.mainloop()
+    def _periodic_update(self):
+        self._update_status_table()
+        self.after(1000, self._periodic_update)
+
+    # -----------------------------
+    # タイマーとトレイ関連
+    # -----------------------------
+    def _create_tray_image(self, color="blue"):
+        img = Image.new('RGB', (64, 64), 'white')
+        d = ImageDraw.Draw(img)
+        d.rectangle((0, 0, 63, 63), fill=color)
+        return img
+
+    def _set_tab_timer(self, tab_name):
+        if self.tab_running_flags.get(tab_name, False):
+            messagebox.showinfo("確認", f"{tab_name}のタイマーは既に実行中です。")
+            return
+        seconds = simpledialog.askinteger("タブタイマー", f"{tab_name} タブの全アプリ終了までの時間（秒）:", minvalue=1)
+        if seconds and seconds > 0:
+            # タイマー開始前にアプリを起動
+            self._run_apps_in_tab(tab_name)
+            # スレッドでタイマーを開始
+            threading.Thread(target=self._start_timer_thread, args=(tab_name, seconds), daemon=True).start()
+
+    def _start_timer_thread(self, tab_name, seconds):
+        # pystrayは自身のスレッドで実行する必要がある
+        icon = pystray.Icon(tab_name, self._create_tray_image("blue"), f"{tab_name} タイマー")
+        self.tab_tray_icons[tab_name] = icon
+        
+        # icon.run()はブロッキングなので、別スレッドで実行
+        threading.Thread(target=icon.run, daemon=True).start()
+
+        self.tab_timers[tab_name] = seconds
+        self.tab_running_flags[tab_name] = True
+        
+        # afterはメインスレッドで実行される必要があるため、ここから呼び出す
+        self.after(100, lambda: self._timer_countdown(tab_name))
+
+    def _timer_countdown(self, tab_name):
+        if self.tab_timers.get(tab_name, 0) > 0 and self.tab_running_flags.get(tab_name, False):
+            self.tab_timers[tab_name] -= 1
+            
+            seconds = self.tab_timers[tab_name]
+            mins, secs = divmod(seconds, 60)
+            if self.tab_tray_icons.get(tab_name):
+                self.tab_tray_icons[tab_name].title = f"{tab_name} 残り: {mins:02d}:{secs:02d}"
+
+            self.after(1000, lambda: self._timer_countdown(tab_name))
+        else:
+            self._stop_timer(tab_name)
+
+    def _stop_timer(self, tab_name):
+        if self.tab_running_flags.get(tab_name, False):
+            self.tab_running_flags[tab_name] = False
+            if self.tab_tray_icons.get(tab_name):
+                self.tab_tray_icons[tab_name].stop()
+                del self.tab_tray_icons[tab_name]
+            self._kill_apps_in_tab(tab_name)
+            self._update_status_table()
+            messagebox.showinfo("タイマー終了", f"{tab_name} のタイマーが終了しました。")
+
+if __name__ == "__main__":
+    app = AppLauncher()
+    app.mainloop()
