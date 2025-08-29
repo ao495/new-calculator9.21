@@ -79,7 +79,6 @@ class AppLauncher(TkinterDnD.Tk):
         frame = tk.Frame(self.tab_control)
         self.tabs[name] = frame
         
-        # 「起動中一覧」タブの直前に挿入
         status_tab_frame = self.status_tree.master
         insert_pos = self.tab_control.index(status_tab_frame)
         self.tab_control.insert(insert_pos, frame, text=name)
@@ -95,7 +94,6 @@ class AppLauncher(TkinterDnD.Tk):
 
         self._refresh_tab_buttons(name)
 
-        # Canvasにドロップイベントをバインド
         canvas.drop_target_register(DND_FILES)
         canvas.dnd_bind('<<Drop>>', lambda e, n=name, f=scroll_frame: self._on_drop_app(e, n, f))
 
@@ -111,8 +109,9 @@ class AppLauncher(TkinterDnD.Tk):
     def _add_app_button(self, parent_frame, tab_name, app_path):
         btn_frame = tk.Frame(parent_frame)
         
+        # 個別起動メソッドを呼び出すように修正
         btn = tk.Button(btn_frame, text=os.path.basename(app_path), width=30, anchor='w',
-                        command=lambda t=tab_name: self._run_apps_in_tab(t))
+                        command=lambda p=app_path, t=tab_name: self._run_single_app(p, t))
         btn.pack(side="left", fill="x", expand=True)
         
         btn.bind("<Button-3>", lambda e, n=tab_name, a=app_path, b=btn_frame: self._on_app_right_click(e, n, a, b))
@@ -190,29 +189,36 @@ class AppLauncher(TkinterDnD.Tk):
         self._save_apps()
         self._refresh_tab_buttons(tab_name)
 
-    def _run_apps_in_tab(self, tab_name):
-        self.running_processes[tab_name] = []
-        self.app_status[tab_name] = []
-        for app_path in self.app_groups.get(tab_name, []):
-            try:
-                target_path = app_path
-                if app_path.lower().endswith('.lnk'):
-                    link = pylnk3.Lnk(app_path)
-                    target_path = link.path
-                
-                proc = subprocess.Popen([target_path])
-                self.running_processes[tab_name].append(proc)
-                self.app_status[tab_name].append({'name': app_path, 'proc': proc, 'status': '起動中'})
-            except Exception as e:
-                self.app_status[tab_name].append({'name': app_path, 'proc': None, 'status': f'起動失敗: {e}'})
+    def _run_single_app(self, app_path, tab_name):
+        if tab_name not in self.running_processes:
+            self.running_processes[tab_name] = []
+        if tab_name not in self.app_status:
+            self.app_status[tab_name] = []
+
+        try:
+            target_path = app_path
+            if app_path.lower().endswith('.lnk'):
+                link = pylnk3.Lnk(app_path)
+                target_path = link.path
+            
+            proc = subprocess.Popen([target_path])
+            self.running_processes[tab_name].append(proc)
+            self.app_status[tab_name].append({'name': app_path, 'proc': proc, 'status': '起動中'})
+        except Exception as e:
+            self.app_status[tab_name].append({'name': app_path, 'proc': None, 'status': f'起動失敗: {e}'})
         self._update_status_table()
 
     def _kill_apps_in_tab(self, tab_name):
         for proc in self.running_processes.get(tab_name, []):
             try:
-                proc.terminate()
-            except Exception:
-                pass
+                # taskkillでプロセスツリーを強制終了
+                subprocess.run(
+                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                    check=True, capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                pass # プロセスが既に存在しない等のエラーは無視
+        
         for app in self.app_status.get(tab_name, []):
             if app['status'] == '起動中':
                 app['status'] = 'タイマー終了'
