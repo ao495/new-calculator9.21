@@ -70,16 +70,6 @@ class AppLauncher(TkinterDnD.Tk):
     # UI構築
     # -----------------------------
     def _setup_ui(self):
-        # ボタン配置用のフレーム
-        button_frame = tk.Frame(self)
-        button_frame.pack(side="top", fill="x", padx=5, pady=5)
-
-        btn_add_tab = tk.Button(button_frame, text="+ タブ追加", command=self._add_new_tab)
-        btn_add_tab.pack(side="right", padx=5)
-
-        btn_timer_main = tk.Button(button_frame, text="タイマー付き一括終了", command=self._set_tab_timer_main)
-        btn_timer_main.pack(side="right", padx=5)
-
         self.tab_control = ttk.Notebook(self)
         self.tab_control.pack(expand=1, fill='both')
 
@@ -93,6 +83,9 @@ class AppLauncher(TkinterDnD.Tk):
         app_tab_names = [name for name in self.app_groups.keys() if name != '起動中一覧']
         for name in app_tab_names:
             self._create_app_tab(name)
+
+        btn_add_tab = tk.Button(self, text="+ タブ追加", command=self._add_new_tab)
+        btn_add_tab.pack(side="top", anchor="ne", padx=5, pady=5)
 
         self.tab_control.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
