@@ -61,13 +61,13 @@ class AppLauncher(TkinterDnD.Tk):
         self.tab_control = ttk.Notebook(self)
         self.tab_control.pack(expand=1, fill='both')
 
-        # アプリタブを先に追加
+        # 最初に固定タブを作成
+        self._create_status_tab()
+
+        # 保存されているアプリタブをstatus_tabの前に追加
         app_tab_names = [name for name in self.app_groups.keys() if name != '起動中一覧']
         for name in app_tab_names:
             self._create_app_tab(name)
-
-        # 最後に固定タブを追加
-        self._create_status_tab()
 
         btn_add_tab = tk.Button(self, text="+ タブ追加", command=self._add_new_tab)
         btn_add_tab.pack(side="top", anchor="ne", padx=5, pady=5)
@@ -75,9 +75,13 @@ class AppLauncher(TkinterDnD.Tk):
         self.tab_control.bind("<<NotebookTabChanged>>", self._on_tab_changed)
 
     def _create_app_tab(self, name):
-        frame = tk.Frame(self.tab_control) # ttk.Frame から tk.Frame に変更
+        frame = tk.Frame(self.tab_control) # tk.Frameを使用
         self.tabs[name] = frame
-        self.tab_control.insert(self.tab_control.index('end') if self.status_tree is not None else 'end', frame, text=name)
+        
+        # 「起動中一覧」タブの直前に挿入
+        status_tab_frame = self.status_tree.master
+        insert_pos = self.tab_control.index(status_tab_frame)
+        self.tab_control.insert(insert_pos, frame, text=name)
 
         canvas = tk.Canvas(frame)
         scrollbar = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
@@ -95,7 +99,7 @@ class AppLauncher(TkinterDnD.Tk):
         canvas.dnd_bind('<<Drop>>', lambda e, n=name, f=scroll_frame: self._on_drop_app(e, n, f))
 
     def _create_status_tab(self):
-        status_tab = tk.Frame(self.tab_control) # ttk.Frame から tk.Frame に変更
+        status_tab = tk.Frame(self.tab_control) # tk.Frameを使用
         self.tab_control.add(status_tab, text="起動中一覧")
         cols = ('グループ名', 'アプリ名', '状態')
         self.status_tree = ttk.Treeview(status_tab, columns=cols, show='headings')
