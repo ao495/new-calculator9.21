@@ -64,6 +64,9 @@ class AppLauncher(TkinterDnD.Tk):
         self.tab_control = ttk.Notebook(self)
         self.tab_control.pack(expand=1, fill='both')
 
+        # 右クリックイベントをバインド
+        self.tab_control.bind("<Button-3>", self._on_tab_right_click)
+
         # 最初に固定タブを作成
         self._create_status_tab()
 
@@ -136,6 +139,25 @@ class AppLauncher(TkinterDnD.Tk):
     # -----------------------------
     # イベントハンドラ
     # -----------------------------
+    def _on_tab_right_click(self, event):
+        clicked_tab = self.tab_control.identify(event.x, event.y)
+        if not clicked_tab:
+            return
+        
+        try:
+            tab_index = self.tab_control.index(clicked_tab)
+            tab_name = self.tab_control.tab(tab_index, "text")
+        except tk.TclError:
+            return # クリック位置がタブでない場合は何もしない
+
+        # 「起動中一覧」タブは削除不可
+        if tab_name == "起動中一覧":
+            return
+
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label=f"タブ '{tab_name}' を削除", command=lambda: self._delete_tab(tab_index, tab_name))
+        menu.post(event.x_root, event.y_root)
+
     def _on_tab_changed(self, event):
         try:
             selected_tab_name = self.tab_control.tab(self.tab_control.select(), "text")
@@ -175,6 +197,15 @@ class AppLauncher(TkinterDnD.Tk):
             self.app_groups[name] = []
             self._save_apps()
             self._create_app_tab(name)
+
+    def _delete_tab(self, tab_index, tab_name):
+        if messagebox.askyesno("タブの削除", f"タブ '{tab_name}' と登録されたすべてのアプリを削除します。\nよろしいですか？"):
+            self.tab_control.forget(tab_index)
+            if tab_name in self.tabs:
+                del self.tabs[tab_name]
+            if tab_name in self.app_groups:
+                del self.app_groups[tab_name]
+            self._save_apps()
 
     def _delete_app(self, tab_name, app_path, btn_frame):
         if messagebox.askyesno("確認", f"{os.path.basename(app_path)}を削除しますか？"):
