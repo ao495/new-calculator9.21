@@ -201,31 +201,46 @@ class AppLauncher(TkinterDnD.Tk):
                 link = pylnk3.Lnk(app_path)
                 target_path = link.path
             
+            # 起動時の情報をapp_statusに保存
             proc = subprocess.Popen([target_path])
-            self.running_processes[tab_name].append(proc)
-            self.app_status[tab_name].append({'name': app_path, 'proc': proc, 'status': '起動中'})
+            self.app_status[tab_name].append({
+                'name': app_path, 
+                'proc': proc, 
+                'status': '起動中',
+                'target_path': target_path # 解決後のパスも保存
+            })
         except Exception as e:
-            self.app_status[tab_name].append({'name': app_path, 'proc': None, 'status': f'起動失敗: {e}'})
+            self.app_status[tab_name].append({'name': app_path, 'proc': None, 'status': f'起動失敗: {e}', 'target_path': None})
         self._update_status_table()
 
     def _kill_apps_in_tab(self, tab_name):
-        pids_to_kill = [p.pid for p in self.running_processes.get(tab_name, [])]
+        apps_to_kill = [
+            app for app in self.app_status.get(tab_name, []) 
+            if app['status'] == '起動中' and app.get('target_path')
+        ]
+        
+        if not apps_to_kill:
+            return
 
-        for pid in pids_to_kill:
+        target_paths = {os.path.normcase(app['target_path']) for app in apps_to_kill}
+
+        for proc in psutil.process_iter(['pid', 'exe']):
             try:
-                parent = psutil.Process(pid)
-                children = parent.children(recursive=True)
-                for child in children:
-                    child.kill()
-                parent.kill()
-            except psutil.NoSuchProcess:
-                pass # プロセスが既に存在しない場合は無視
+                if proc.info['exe'] and os.path.normcase(proc.info['exe']) in target_paths:
+                    parent = psutil.Process(proc.info['pid'])
+                    children = parent.children(recursive=True)
+                    for child in children:
+                        child.kill()
+                    parent.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
             except Exception as e:
-                print(f"プロセス {pid} の終了に失敗: {e}") # デバッグ用
+                print(f"プロセス検索・終了中にエラー: {e}")
 
         for app in self.app_status.get(tab_name, []):
             if app['status'] == '起動中':
                 app['status'] = 'タイマー終了'
+        # running_processesは使わないのでクリア
         self.running_processes[tab_name] = []
 
     def _update_status_table(self):
@@ -237,12 +252,13 @@ class AppLauncher(TkinterDnD.Tk):
         combined_list = []
         for tab, apps in self.app_status.items():
             for a in apps:
+                # Popenオブジェクトが終了しているか確認
                 if a.get('proc') and a['status'] == '起動中':
                     if a['proc'].poll() is not None:
                         a['status'] = 'ユーザー終了'
                 combined_list.append({'tab': tab, 'name': a['name'], 'status': a['status']})
         
-        combined_list.sort(key=lambda x: (x['status'] != '起動中', x['status'] != 'タイマー終了'))
+        combined_list.sort(key=lambda x: (x['status'] != '起動中', x['status'] != 'タイマー終了', x['status'] != 'ユーザー終了'))
         for app in combined_list:
             self.status_tree.insert('', 'end', values=(app['tab'], os.path.basename(app['name']), app['status']))
 
@@ -264,7 +280,9 @@ class AppLauncher(TkinterDnD.Tk):
             messagebox.showinfo("確認", f"{tab_name}のタイマーは既に実行中です。")
             return
         
-        if not self.running_processes.get(tab_name):
+        # 起動中のアプリがあるかチェック
+        is_running = any(app['status'] == '起動中' for app in self.app_status.get(tab_name, []))
+        if not is_running:
             messagebox.showinfo("確認", f"{tab_name}で起動中のアプリがありません。先にアプリを起動してください。")
             return
 
