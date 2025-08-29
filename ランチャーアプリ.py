@@ -253,9 +253,13 @@ class AppLauncher(TkinterDnD.Tk):
         if self.tab_running_flags.get(tab_name, False):
             messagebox.showinfo("確認", f"{tab_name}のタイマーは既に実行中です。")
             return
+        
+        if not self.running_processes.get(tab_name):
+            messagebox.showinfo("確認", f"{tab_name}で起動中のアプリがありません。先にアプリを起動してください。")
+            return
+
         seconds = simpledialog.askinteger("タブタイマー", f"{tab_name} タブの全アプリ終了までの時間（秒）:", minvalue=1)
         if seconds and seconds > 0:
-            self._run_apps_in_tab(tab_name)
             threading.Thread(target=self._start_timer_thread, args=(tab_name, seconds), daemon=True).start()
 
     def _start_timer_thread(self, tab_name, seconds):
