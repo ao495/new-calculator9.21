@@ -220,16 +220,19 @@ class AppLauncher(TkinterDnD.Tk):
     def _on_drop_app(self, event, tab_name, scroll_frame):
         files = self.tk.splitlist(event.data)
         for f in files:
-            if os.path.isfile(f):
+            # パスを正規化
+            f_normalized = os.path.normpath(os.path.abspath(f))
+
+            if os.path.isfile(f_normalized):
                 if tab_name not in self.app_groups:
                     self.app_groups[tab_name] = []
-                self.app_groups[tab_name].append(f)
-                self._add_app_button(scroll_frame, tab_name, f)
-            elif os.path.isdir(f): # フォルダの場合
+                self.app_groups[tab_name].append(f_normalized)
+                self._add_app_button(scroll_frame, tab_name, f_normalized)
+            elif os.path.isdir(f_normalized): # フォルダの場合
                 if tab_name not in self.app_groups:
                     self.app_groups[tab_name] = []
-                self.app_groups[tab_name].append(FOLDER_PREFIX + f) # プレフィックスを付けて登録
-                self._add_app_button(scroll_frame, tab_name, FOLDER_PREFIX + f)
+                self.app_groups[tab_name].append(FOLDER_PREFIX + f_normalized) # プレフィックスを付けて登録
+                self._add_app_button(scroll_frame, tab_name, FOLDER_PREFIX + f_normalized)
         self._save_apps()
 
     def _on_app_right_click(self, event, tab_name, app_path, btn_frame):
