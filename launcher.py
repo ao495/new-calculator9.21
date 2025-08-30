@@ -104,6 +104,9 @@ class AppLauncher(TkinterDnD.Tk):
             self._create_app_tab(name)
 
         self.tab_control.bind("<<NotebookTabChanged>>", self._on_tab_changed)
+        self.tab_control.bind("<MouseWheel>", self._on_mouse_scroll_tab_switch) # Windows/Linux
+        self.tab_control.bind("<Button-4>", self._on_mouse_scroll_tab_switch) # macOS scroll up
+        self.tab_control.bind("<Button-5>", self._on_mouse_scroll_tab_switch) # macOS scroll down
 
         # 最後に使用していたタブを選択
         if self.last_active_tab and self.last_active_tab in self.tabs:
@@ -220,6 +223,19 @@ class AppLauncher(TkinterDnD.Tk):
             if self.tab_running_flags.get(tab_name, False):
                 color = "green" if tab_name == selected_tab_name else "blue"
                 tray_icon.icon = self._create_tray_image(color)
+
+    def _on_mouse_scroll_tab_switch(self, event):
+        current_tab_index = self.tab_control.index(self.tab_control.select())
+        num_tabs = len(self.tab_control.tabs())
+
+        if event.delta > 0 or event.num == 4:  # Scroll up
+            new_tab_index = (current_tab_index - 1 + num_tabs) % num_tabs
+        elif event.delta < 0 or event.num == 5:  # Scroll down
+            new_tab_index = (current_tab_index + 1) % num_tabs
+        else:
+            return # No scroll or unrecognized event
+
+        self.tab_control.select(new_tab_index)
 
     def _on_drop_app(self, event, tab_name, scroll_frame):
         files = self.tk.splitlist(event.data)
