@@ -163,7 +163,7 @@ class AppLauncher(TkinterDnD.Tk):
             command_func = lambda p=folder_path: self._open_folder(p)
 
         btn = tk.Button(btn_frame, text=display_name, width=30, anchor='w',
-                        command=command_func, bg="#E0E0E0") # Added background color
+                        command=command_func, bg="#ADD8E6") # Changed to pastel light blue
         btn.pack(side="left", fill="x", expand=True)
         
         btn.bind("<Button-3>", lambda e, n=tab_name, a=app_path, b=btn_frame: self._on_app_right_click(e, n, a, b))
