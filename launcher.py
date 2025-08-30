@@ -78,12 +78,16 @@ class AppLauncher(TkinterDnD.Tk):
         button_frame.grid_columnconfigure(0, weight=1) # 左側のカラムを広げる
         button_frame.grid_columnconfigure(1, weight=0) # タイマーボタンのカラムは固定
         button_frame.grid_columnconfigure(2, weight=0) # タブ追加ボタンのカラムは固定
+        button_frame.grid_columnconfigure(3, weight=0) # タブ削除ボタンのカラムは固定
 
         btn_timer_main = tk.Button(button_frame, text="タイマー付き一括終了", command=self._set_tab_timer_main)
         btn_timer_main.grid(row=0, column=1, padx=5) # column=1 に配置
 
         btn_add_tab = tk.Button(button_frame, text="+ タブ追加", command=self._add_new_tab)
         btn_add_tab.grid(row=0, column=2, padx=5) # column=2 に配置
+
+        btn_delete_tab = tk.Button(button_frame, text="タブ削除", command=self._delete_current_tab)
+        btn_delete_tab.grid(row=0, column=3, padx=5) # column=3 に配置
 
         self.tab_control = ttk.Notebook(self)
         self.tab_control.pack(expand=1, fill='both')
@@ -266,6 +270,19 @@ class AppLauncher(TkinterDnD.Tk):
             if tab_name in self.app_groups:
                 del self.app_groups[tab_name]
             self._save_apps()
+
+    def _delete_current_tab(self):
+        try:
+            selected_tab_index = self.tab_control.index(self.tab_control.select())
+            selected_tab_name = self.tab_control.tab(selected_tab_index, "text")
+
+            if selected_tab_name == "起動中一覧":
+                messagebox.showinfo("確認", "「起動中一覧」タブは削除できません。")
+                return
+            
+            self._delete_tab(selected_tab_index, selected_tab_name)
+        except tk.TclError:
+            messagebox.showinfo("確認", "削除するタブが選択されていません。")
 
     def _delete_app(self, tab_name, app_path, btn_frame):
         if messagebox.askyesno("確認", f"{os.path.basename(app_path)}を削除しますか？"):
