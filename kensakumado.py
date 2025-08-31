@@ -16,11 +16,44 @@ class TraySearchApp(tk.Tk):
         super().__init__()
 
         # --- スタイルの設定 ---
+        self.dark_mode = True # ダークモードの切り替え用フラグ (将来的に)
+        self.colors = {
+            'bg': '#2E2E2E',
+            'fg': '#EAEAEA',
+            'entry_bg': '#3C3C3C',
+            'entry_fg': '#EAEAEA',
+            'btn_bg': '#555555',
+            'btn_fg': '#EAEAEA',
+            'tab_bg': '#2E2E2E',
+            'tab_fg': '#EAEAEA',
+            'tab_selected_bg': '#4A4A4A',
+            'tab_selected_fg': '#FFFFFF'
+        }
+
         style = ttk.Style(self)
-        try:
-            style.theme_use('vista') # Windowsで利用可能なテーマ
-        except tk.TclError:
-            print("'vista' テーマが利用できません。デフォルトのテーマを使用します。")
+        style.theme_use('clam') # カスタマイズしやすいclamテーマをベースにする
+
+        # --- 全体のスタイル ---
+        style.configure('.', background=self.colors['bg'], foreground=self.colors['fg'], fieldbackground=self.colors['entry_bg'], lightcolor=self.colors['bg'], darkcolor=self.colors['bg'], bordercolor=self.colors['bg'])
+        self.configure(background=self.colors['bg'])
+
+        # --- 各ウィジェットのスタイル ---
+        style.configure('TFrame', background=self.colors['bg'])
+        style.configure('TLabel', background=self.colors['bg'], foreground=self.colors['fg'])
+        style.configure('TButton', background=self.colors['btn_bg'], foreground=self.colors['btn_fg'])
+        style.map('TButton', background=[('active', '#6A6A6A')])
+        style.configure('TEntry', fieldbackground=self.colors['entry_bg'], foreground=self.colors['entry_fg'], insertcolor=self.colors['fg'])
+        
+        # --- タブのスタイル ---
+        style.configure('TNotebook', background=self.colors['bg'])
+        style.configure('TNotebook.Tab', background=self.colors['tab_bg'], foreground=self.colors['tab_fg'], padding=[5, 2])
+        style.map('TNotebook.Tab', background=[('selected', self.colors['tab_selected_bg'])], foreground=[('selected', self.colors['tab_selected_fg'])])
+
+        # --- Treeview (リスト) のスタイル ---
+        style.configure("Treeview", background=self.colors['entry_bg'], fieldbackground=self.colors['entry_bg'], foreground=self.colors['fg'])
+        style.map('Treeview', background=[('selected', self.colors['tab_selected_bg'])])
+        style.configure("Treeview.Heading", background=self.colors['btn_bg'], foreground=self.colors['btn_fg'])
+        style.map("Treeview.Heading", background=[('active', '#6A6A6A')])
         self.title("単語ボタン検索アプリ")
         self.geometry("700x250")
         self.protocol("WM_DELETE_WINDOW", self._hide_window)
@@ -49,6 +82,10 @@ class TraySearchApp(tk.Tk):
         self.search_btn = ttk.Button(search_frame, text="検索", command=self._search)
         self.search_btn.pack(side="left", padx=(5, 0))
 
+        # --- 設定ボタン ---
+        settings_btn = ttk.Button(search_frame, text="⚙", width=3, command=self._open_settings_window)
+        settings_btn.pack(side="left", padx=(5, 0))
+
         # --- 単語ボタンフレーム ---
         self.words_frame = ttk.Frame(self)
         self.words_frame.pack(pady=5, padx=10, fill=tk.X)
@@ -61,10 +98,6 @@ class TraySearchApp(tk.Tk):
         # --- 単語追加ボタン ---
         add_word_btn = ttk.Button(button_frame, text="単語追加", command=self._add_word)
         add_word_btn.pack(side="left", padx=5)
-
-        # --- 設定ボタン ---
-        settings_btn = ttk.Button(button_frame, text="設定", command=self._open_settings_window)
-        settings_btn.pack(side="left", padx=5)
 
         # --- トレイ ---
         self.icon = pystray.Icon("TraySearch", self._create_tray_image(), "検索アプリ")
@@ -134,7 +167,7 @@ class TraySearchApp(tk.Tk):
 
         # search_enginesに基づいてタブを再作成
         for name in self.search_engines.keys():
-            frame = tk.Frame(self.tab_control)
+            frame = ttk.Frame(self.tab_control)
             self.tab_control.add(frame, text=name)
             self.tabs[name] = frame
 
@@ -199,6 +232,7 @@ class TraySearchApp(tk.Tk):
         self.settings_window = tk.Toplevel(self)
         self.settings_window.title("設定")
         self.settings_window.geometry("600x450") # 高さを少し増やす
+        self.settings_window.configure(background=self.colors['bg'])
         self.settings_window.transient(self) # メインウィンドウの上に表示
         self.settings_window.grab_set() # モーダルにする
 
