@@ -111,14 +111,14 @@ class TraySearchApp(tk.Tk):
         # --- ホットキー ---
         self.current_hotkey = self.config_data.get('hotkey', 'ctrl+shift+s')
         try:
-            self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
+            self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window, suppress=True)
         except ValueError:
             messagebox.showerror("エラー", f"無効なホットキーが設定されています: {self.current_hotkey}")
             self.current_hotkey = 'ctrl+shift+s' # デフォルトに戻す
-            self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
+            self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window, suppress=True)
 
         # 入力途中での非表示用ホットキー
-        keyboard.add_hotkey("ctrl+m", self._hide_window)
+        keyboard.add_hotkey("ctrl+m", self._hide_window, suppress=True)
 
         # 最初は非表示でトレイ常駐
         self.withdraw()
@@ -321,7 +321,7 @@ class TraySearchApp(tk.Tk):
 
         try:
             # 新しいホットキーを登録し、新しいハンドルを保存
-            self.hotkey_handler = keyboard.add_hotkey(new_hotkey, self._toggle_window)
+            self.hotkey_handler = keyboard.add_hotkey(new_hotkey, self._toggle_window, suppress=True)
             self.current_hotkey = new_hotkey
             self.config_data['hotkey'] = new_hotkey
             self.hotkey_entry_var.set(new_hotkey)
@@ -331,7 +331,7 @@ class TraySearchApp(tk.Tk):
             messagebox.showerror("エラー", f"無効なキーの組み合わせです: {e}", parent=self.settings_window)
             # エラーが発生した場合、古いホットキーを再登録
             try:
-                self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
+                self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window, suppress=True)
             except (ValueError, KeyError):
                 pass # 再登録にも失敗した場合は何もしない
 
