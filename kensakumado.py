@@ -193,7 +193,6 @@ class TraySearchApp(tk.Tk):
             # {} の中身に関わらず、プレースホルダーを置換する
             url = re.sub(r'\{.*?\}', query.replace(" ", "+"), engine_url)
             webbrowser.open(url)
-            self._hide_window()  # 検索後は自動で最小化
 
     # -----------------------------
     # トレイ関連
