@@ -222,6 +222,8 @@ class TraySearchApp(tk.Tk):
         self.lift()
         self.focus_force()
         self.main_entry.focus_force() # 検索窓にフォーカスを当てる
+        self.wm_attributes('-topmost', 1) # 最前面に表示
+        self.after(100, lambda: self.wm_attributes('-topmost', 0)) # 少し遅れて解除
 
     def _toggle_window(self):
         if self.winfo_viewable():
