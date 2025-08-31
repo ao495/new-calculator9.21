@@ -117,6 +117,9 @@ class TraySearchApp(tk.Tk):
             self.current_hotkey = 'ctrl+shift+s' # デフォルトに戻す
             self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
 
+        # 入力途中での非表示用ホットキー
+        keyboard.add_hotkey("ctrl+m", self._hide_window)
+
         # 最初は非表示でトレイ常駐
         self.withdraw()
 
