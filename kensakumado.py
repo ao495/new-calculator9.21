@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, simpledialog, messagebox
+from tkinter import ttk, simpledialog, messagebox, font
 import webbrowser
 import json
 import os
@@ -42,8 +42,10 @@ class TraySearchApp(tk.Tk):
         # --- 検索窓 --- 
         search_frame = ttk.Frame(self)
         search_frame.pack(fill=tk.X, padx=10, pady=5)
-        self.main_entry = ttk.Entry(search_frame, width=60)
+        entry_font = font.Font(family="Yu Gothic UI", size=14)
+        self.main_entry = ttk.Entry(search_frame, width=60, font=entry_font)
         self.main_entry.pack(side="left", expand=True, fill="x")
+        self.main_entry.bind("<Return>", self._search_on_enter)
         self.search_btn = ttk.Button(search_frame, text="検索", command=self._search)
         self.search_btn.pack(side="left", padx=(5, 0))
 
@@ -76,11 +78,11 @@ class TraySearchApp(tk.Tk):
         # --- ホットキー ---
         self.current_hotkey = self.config_data.get('hotkey', 'ctrl+shift+s')
         try:
-            keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
+            self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
         except ValueError:
             messagebox.showerror("エラー", f"無効なホットキーが設定されています: {self.current_hotkey}")
             self.current_hotkey = 'ctrl+shift+s' # デフォルトに戻す
-            keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
+            self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
 
         # 最初は非表示でトレイ常駐
         self.withdraw()
@@ -148,6 +150,10 @@ class TraySearchApp(tk.Tk):
     # -----------------------------
     # 検索機能
     # -----------------------------
+    def _search_on_enter(self, event=None):
+        """Enterキーが押されたときに検索を実行する"""
+        self._search()
+
     def _search(self):
         selected_tab = self.tab_control.tab(self.tab_control.select(), "text")
         engine_url = self.search_engines.get(selected_tab)
@@ -174,6 +180,7 @@ class TraySearchApp(tk.Tk):
         self.deiconify()
         self.lift()
         self.focus_force()
+        self.main_entry.focus_force() # 検索窓にフォーカスを当てる
 
     def _toggle_window(self):
         if self.winfo_viewable():
@@ -261,24 +268,24 @@ class TraySearchApp(tk.Tk):
         self.after(0, self._set_new_hotkey, new_hotkey)
 
     def _set_new_hotkey(self, new_hotkey):
-        try:
-            keyboard.remove_hotkey(self.current_hotkey)
-        except KeyError:
-            print(f"ホットキー '{self.current_hotkey}' は登録されていませんでした。")
+        # 古いホットキーをハンドルで正確に解除
+        keyboard.remove_hotkey(self.hotkey_handler)
 
         try:
-            keyboard.add_hotkey(new_hotkey, self._toggle_window)
+            # 新しいホットキーを登録し、新しいハンドルを保存
+            self.hotkey_handler = keyboard.add_hotkey(new_hotkey, self._toggle_window)
             self.current_hotkey = new_hotkey
             self.config_data['hotkey'] = new_hotkey
             self.hotkey_entry_var.set(new_hotkey)
             self._save_config()
             messagebox.showinfo("成功", f"ホットキーが '{new_hotkey}' に設定されました。", parent=self.settings_window)
-        except ValueError as e:
+        except (ValueError, KeyError) as e:
             messagebox.showerror("エラー", f"無効なキーの組み合わせです: {e}", parent=self.settings_window)
+            # エラーが発生した場合、古いホットキーを再登録
             try:
-                keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
-            except ValueError:
-                pass
+                self.hotkey_handler = keyboard.add_hotkey(self.current_hotkey, self._toggle_window)
+            except (ValueError, KeyError):
+                pass # 再登録にも失敗した場合は何もしない
 
         self.change_hotkey_btn.config(text="変更", state="normal")
 

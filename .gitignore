@@ -1,28 +1,11 @@
-# Python
-__pycache__/
 *.pyc
-*.pyo
-*.pyd
+__pycache__/
+.DS_Store
 
-# PyInstaller
+# User-specific files
+search_config.json
+
+# Build artifacts
 build/
 dist/
 *.spec
-
-# Log files
-*.log
-debug_log.txt
-
-# User-specific files
-config.json
-last_folder.json
-cookies.txt
-downloaded_videos.txt
-
-# Output files
-output_*.docx
-output_final/
-part/
-
-# Dependencies
-ffmpeg/
