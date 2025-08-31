@@ -14,6 +14,13 @@ CONFIG_FILE = "search_config.json"
 class TraySearchApp(tk.Tk):
     def __init__(self):
         super().__init__()
+
+        # --- スタイルの設定 ---
+        style = ttk.Style(self)
+        try:
+            style.theme_use('vista') # Windowsで利用可能なテーマ
+        except tk.TclError:
+            print("'vista' テーマが利用できません。デフォルトのテーマを使用します。")
         self.title("単語ボタン検索アプリ")
         self.geometry("700x250")
         self.protocol("WM_DELETE_WINDOW", self._hide_window)
@@ -28,31 +35,33 @@ class TraySearchApp(tk.Tk):
 
         # --- タブ ---
         self.tab_control = ttk.Notebook(self)
-        self.tab_control.pack(fill="x", pady=5)
+        self.tab_control.pack(fill="x", padx=10, pady=5)
         self.tabs = {}
         self._refresh_search_tabs()
 
-        # --- 検索窓 ---
-        self.main_entry = tk.Entry(self, width=60)
-        self.main_entry.pack(pady=5, padx=5, side="left", expand=True, fill="x")
-        self.search_btn = tk.Button(self, text="検索", command=self._search)
-        self.search_btn.pack(padx=5, side="left")
+        # --- 検索窓 --- 
+        search_frame = ttk.Frame(self)
+        search_frame.pack(fill=tk.X, padx=10, pady=5)
+        self.main_entry = ttk.Entry(search_frame, width=60)
+        self.main_entry.pack(side="left", expand=True, fill="x")
+        self.search_btn = ttk.Button(search_frame, text="検索", command=self._search)
+        self.search_btn.pack(side="left", padx=(5, 0))
 
         # --- 単語ボタンフレーム ---
-        self.words_frame = tk.Frame(self)
-        self.words_frame.pack(pady=10)
+        self.words_frame = ttk.Frame(self)
+        self.words_frame.pack(pady=5, padx=10, fill=tk.X)
         self._refresh_word_buttons()
 
         # --- ボタンフレーム ---
-        button_frame = tk.Frame(self)
-        button_frame.pack(pady=5)
+        button_frame = ttk.Frame(self)
+        button_frame.pack(pady=(5, 10))
 
         # --- 単語追加ボタン ---
-        add_word_btn = tk.Button(button_frame, text="単語追加", command=self._add_word)
+        add_word_btn = ttk.Button(button_frame, text="単語追加", command=self._add_word)
         add_word_btn.pack(side="left", padx=5)
 
         # --- 設定ボタン ---
-        settings_btn = tk.Button(button_frame, text="設定", command=self._open_settings_window)
+        settings_btn = ttk.Button(button_frame, text="設定", command=self._open_settings_window)
         settings_btn.pack(side="left", padx=5)
 
         # --- トレイ ---
@@ -83,8 +92,8 @@ class TraySearchApp(tk.Tk):
         for widget in self.words_frame.winfo_children():
             widget.destroy()
         for word in self.common_words:
-            btn = tk.Button(self.words_frame, text=word, command=lambda w=word: self._add_word_to_entry(w))
-            btn.pack(side="left", padx=3)
+            btn = ttk.Button(self.words_frame, text=word, command=lambda w=word: self._add_word_to_entry(w))
+            btn.pack(side="left", padx=3, pady=3)
             btn.bind("<Button-3>", lambda e, w=word: self._remove_word(w))
 
     def _add_word_to_entry(self, word):
