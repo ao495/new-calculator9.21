@@ -201,9 +201,20 @@ class TraySearchApp(tk.Tk):
     # トレイ関連
     # -----------------------------
     def _create_tray_image(self):
-        img = Image.new('RGB', (64, 64), color='blue')
+        # 64x64の透明な画像を作成
+        img = Image.new('RGBA', (64, 64), (0, 0, 0, 0)) # RGBAで透明背景
         d = ImageDraw.Draw(img)
-        d.rectangle((0, 0, 63, 63), fill="green")
+
+        # レンズ (円)
+        lens_color = (200, 200, 200, 255) # 明るいグレー
+        lens_border_color = (100, 100, 100, 255) # 濃いグレー
+        lens_bbox = [(18, 18), (46, 46)] # x1, y1, x2, y2
+        d.ellipse(lens_bbox, fill=lens_color, outline=lens_border_color, width=2)
+
+        # 柄 (線)
+        handle_color = (150, 150, 150, 255) # グレー
+        d.line([(40, 40), (55, 55)], fill=handle_color, width=4)
+
         return img
 
     def _hide_window(self):
