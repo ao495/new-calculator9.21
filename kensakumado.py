@@ -109,7 +109,7 @@ class TraySearchApp(tk.Tk):
         threading.Thread(target=self.icon.run, daemon=True).start()
 
         # --- ホットキー ---
-        self.current_hotkey = self.config_data.get('hotkey', 'ctrl+space')
+        self.current_hotkey = self.config_data.get('hotkey', 'ctrl+alt+space')
         self._register_hotkey(self.current_hotkey)
 
         # 入力途中での非表示用ホットキー
