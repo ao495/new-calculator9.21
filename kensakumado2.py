@@ -117,6 +117,7 @@ class TraySearchApp(tk.Tk):
         })
         self.hotkey_combination = set(self.config_data.get('hotkey', ['ctrl_l','alt_l','space']))
         self.focus_delay = self.config_data.get('focus_delay', 500) # Default to 500ms
+        self.minimize_after_search = self.config_data.get('minimize_after_search', False)
 
         # --- タブ ---
         self.tab_control = ttk.Notebook(self)
@@ -131,6 +132,7 @@ class TraySearchApp(tk.Tk):
         self.main_entry = ttk.Entry(search_frame, width=60, font=entry_font)
         self.main_entry.pack(side="left", expand=True, fill="x")
         self.main_entry.bind("<Return>", self._search_on_enter)
+        self.main_entry.bind("<Button-3>", self._show_context_menu)
         ttk.Button(search_frame, text="検索", command=self._search).pack(side="left", padx=(5,0))
         ttk.Button(search_frame, text="⚙", width=3, command=self._open_settings_window).pack(side="left", padx=(5,0))
 
@@ -233,8 +235,115 @@ class TraySearchApp(tk.Tk):
         if query and engine_url:
             url = re.sub(r'\{.*?\}', query.replace(" ","+"), engine_url)
             webbrowser.open(url)
-            # ブラウザが開いた後にメインウィンドウとエントリーにフォーカスを戻す
-            self.after(self.focus_delay, self._show_window) # _show_windowがフォーカス処理を含む
+            
+            # 設定に応じて動作を変更
+            if self.minimize_after_search:
+                self._hide_window()
+            else:
+                # ブラウザが開いた後にメインウィンドウとエントリーにフォーカスを戻す
+                self.after(self.focus_delay, self._show_window) # _show_windowがフォーカス処理を含む
+
+    def _show_context_menu(self, event):
+        context_menu = tk.Menu(self, tearoff=0, bg=self.colors['bg'], fg=self.colors['fg'])
+
+        selected_text = self._get_selected_text_or_word(event)
+        state = tk.NORMAL if selected_text else tk.DISABLED
+
+        # ラムダの引数をデフォルト値として束縛する
+        context_menu.add_command(label=f'ANDで追加: "{selected_text}"', state=state, command=lambda word=selected_text: self._add_modifier("AND", word))
+        context_menu.add_command(label=f'ORで追加: "{selected_text}"', state=state, command=lambda word=selected_text: self._add_modifier("OR", word))
+        context_menu.add_command(label=f'除外(-)で追加: "{selected_text}"', state=state, command=lambda word=selected_text: self._add_modifier("EXCLUDE", word))
+        context_menu.add_command(label=f'完全一致("")で追加: "{selected_text}"', state=state, command=lambda word=selected_text: self._add_modifier("EXACT", word))
+        context_menu.add_separator()
+
+        context_menu.add_command(label="site: 指定で追加", command=lambda: self._add_specifier("site"))
+        context_menu.add_command(label="filetype: 指定で追加", command=lambda: self._add_specifier("filetype"))
+        context_menu.add_command(label="intitle: 指定で追加", command=lambda: self._add_specifier("intitle"))
+
+        try:
+            context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            context_menu.grab_release()
+
+    def _get_selected_text_or_word(self, event):
+        # 方法1: selection_get (テキスト選択されている場合)
+        try:
+            selected_text = self.main_entry.selection_get()
+            if selected_text:
+                return selected_text.strip()
+        except tk.TclError:
+            pass # 選択されていない場合はエラーになるので無視
+
+        # 方法2: カーソル位置から自前で単語の境界を探す
+        try:
+            entry_text = self.main_entry.get()
+            click_index = self.main_entry.index(f"@{event.x},{event.y}")
+            
+            # Tcl/Tkのインデックスは "line.char" 形式だが、Entryでは line は常に 0
+            # "0.12" のような形式なので、char部分だけ取り出す
+            char_index = int(click_index.split('.')[1])
+
+            if char_index >= len(entry_text) or not entry_text[char_index].strip():
+                 return "" # クリック位置が空白か範囲外なら何もしない
+
+            # 単語の開始位置を探す
+            start_pos = char_index
+            while start_pos > 0 and entry_text[start_pos - 1].strip():
+                start_pos -= 1
+
+            # 単語の終了位置を探す
+            end_pos = char_index
+            while end_pos < len(entry_text) and entry_text[end_pos].strip():
+                end_pos += 1
+            
+            word = entry_text[start_pos:end_pos]
+            if word:
+                return word.strip()
+
+        except (tk.TclError, ValueError, IndexError):
+            # インデックスのパース失敗なども考慮
+            pass
+
+        return ""
+
+    def _add_modifier(self, modifier_type, word):
+        current_text = self.main_entry.get().strip()
+        if not word:
+            return
+
+        if modifier_type == "AND":
+            addition = f"AND {word}"
+        elif modifier_type == "OR":
+            addition = f"OR {word}"
+        elif modifier_type == "EXCLUDE":
+            addition = f"-{word}"
+        elif modifier_type == "EXACT":
+            addition = f'"{word}"'
+        else:
+            return
+
+        if current_text:
+            new_text = f"{current_text} {addition}"
+        else:
+            if modifier_type in ["AND", "OR"]:
+                new_text = word
+            else:
+                new_text = addition
+        
+        self.main_entry.delete(0, tk.END)
+        self.main_entry.insert(0, new_text.strip() + " ")
+        self.main_entry.focus_set()
+
+    def _add_specifier(self, specifier_type):
+        current_text = self.main_entry.get().strip()
+        specifier_string = f" {specifier_type}:"
+        
+        self.main_entry.delete(0, tk.END)
+        self.main_entry.insert(0, current_text + specifier_string)
+        
+        # Place cursor after the colon
+        self.main_entry.icursor(tk.END)
+        self.main_entry.focus_set()
 
     # -----------------------------
     # トレイ
@@ -309,7 +418,7 @@ class TraySearchApp(tk.Tk):
             self.settings_window.lift(); return
         self.settings_window = tk.Toplevel(self)
         self.settings_window.title("設定")
-        self.settings_window.geometry("600x500")
+        self.settings_window.geometry("600x550") # 高さを広げる
         self.settings_window.configure(background=self.colors['bg'])
         self.settings_window.transient(self)
         self.settings_window.grab_set()
@@ -344,6 +453,19 @@ class TraySearchApp(tk.Tk):
         ttk.Label(fd_frame, text="遅延時間:").pack(side=tk.LEFT, padx=5)
         ttk.Entry(fd_frame, textvariable=self.focus_delay_var, width=10).pack(side=tk.LEFT, padx=5)
         ttk.Button(fd_frame, text="設定", command=self._save_focus_delay).pack(side=tk.LEFT, padx=5)
+
+        # --- 検索後に最小化設定 ---
+        mas_frame = ttk.LabelFrame(main_frame, text="動作設定", padding=10)
+        mas_frame.pack(fill=tk.X, pady=5)
+
+        self.minimize_var = tk.BooleanVar(value=self.minimize_after_search)
+        chk = ttk.Checkbutton(mas_frame, text="検索後にウィンドウを最小化（非表示に）する",
+                              variable=self.minimize_var, command=self._toggle_minimize_setting)
+        chk.pack(side=tk.LEFT, padx=5)
+
+    def _toggle_minimize_setting(self):
+        self.minimize_after_search = self.minimize_var.get()
+        self._save_config()
 
     def _add_search_engine(self):
         n = ask_string_dark(self.settings_window, "追加", "検索エンジン名:", colors=self.colors)
@@ -463,6 +585,7 @@ class TraySearchApp(tk.Tk):
         self.config_data["search_engines"] = self.search_engines
         self.config_data["hotkey"] = list(self.hotkey_combination)
         self.config_data["focus_delay"] = self.focus_delay
+        self.config_data["minimize_after_search"] = self.minimize_after_search
         with open(CONFIG_FILE,"w",encoding="utf-8") as f: json.dump(self.config_data,f,ensure_ascii=False,indent=2)
 
     # -----------------------------
