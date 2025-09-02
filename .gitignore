@@ -4,8 +4,22 @@ __pycache__/
 
 # User-specific files
 search_config.json
+config.json
+cookies.txt
+downloaded_videos.txt
+last_folder.json
+debug_log.txt
+gemini_project/config.json
 
 # Build artifacts
-build/
-dist/
+/build/
+/dist/
 *.spec
+
+# Large binary files & directories
+/ffmpeg/
+
+# Temporary / Output files
+/output_*/
+/part/
+*.docx

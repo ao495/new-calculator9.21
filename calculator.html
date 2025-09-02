@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>履歴付き電卓（折り返し表示版）</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body { font-family: sans-serif; margin: 20px; }
+  .container { display: flex; flex-direction: column; max-width: 400px; margin: auto; }
+  
+  .history {
+    border: 1px solid #ccc; padding: 10px; height: 180px; 
+    overflow-y: auto; margin-bottom: 10px; background: #f9f9f9;
+    text-align: right; font-size: 16px;
+  }
+  .history div { margin: 2px 0; }
+  
+  textarea#display { 
+    width: 100%; padding: 12px; font-size: 28px; 
+    text-align: right; box-sizing: border-box; 
+    resize: none; overflow-y: auto; 
+    white-space: pre-wrap; word-wrap: break-word; word-break: keep-all;
+  }
+
+  .buttons {
+    display: grid; 
+    grid-template-columns: repeat(5, 1fr); 
+    grid-auto-rows: 60px; 
+    gap: 5px;
+  }
+  button { font-size: 20px; padding: 0; margin:0; }
+  .number { background: #fff; }
+  .operator { background: #f3b25b; }
+
+  /* ボタン配置 */
+  .btn-back { grid-column: 4 / 5; grid-row: 1 / 2; }
+  .btn-history-clear { grid-column: 5 / 6; grid-row: 1 / 2; }
+  .btn-ac { grid-column: 4 / 5; grid-row: 2 / 3; }
+  .btn-minus { grid-column: 5 / 6; grid-row: 2 / 3; }
+  .btn-multiply { grid-column: 5 / 6; grid-row: 3 / 4; } 
+  .btn-divide { grid-column: 5 / 6; grid-row: 4 / 5; }
+  .btn-plus { grid-column: 4 / 5; grid-row: 3 / 5; } 
+  .btn-zero { grid-column: 1 / 2; grid-row: 4 / 5; }
+  .btn-equal { grid-column: 2 / 4; grid-row: 4 / 5; }
+
+  /* --- スマホ向けレスポンシブ対応 --- */
+  @media (max-width: 480px) {
+    body {
+      margin: 5px; /* 余白を減らす */
+      overflow: hidden; /* スクロールバーを隠す */
+    }
+    .container {
+      max-width: 100%; /* 横幅いっぱいにする */
+      height: 100vh; /* 高さを画面いっぱいにする */
+      justify-content: space-around; /* パーツを均等配置 */
+    }
+    h2 {
+      font-size: 20px;
+      text-align: center;
+      margin: 5px 0;
+      flex-grow: 0;
+    }
+    .history {
+      font-size: 14px;
+      height: 25%; /* 全体の高さの25% */
+      flex-grow: 0;
+    }
+    textarea#display {
+      font-size: 24px; /* フォントサイズを調整 */
+      height: 15%; /* 全体の高さの15% */
+      flex-grow: 0;
+    }
+    .buttons {
+      gap: 8px; /* ボタンの間隔を少し広げる */
+      flex-grow: 1; /* 残りのスペースを埋める */
+    }
+    button {
+      font-size: 22px; /* ボタンの文字を少し大きく */
+    }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>履歴付き電卓</h2>
+  <div class="history" id="history"></div>
+  <textarea id="display" readonly></textarea>
+
+  <div class="buttons">
+    <!-- 1行目 -->
+    <button class="number" onclick="press('7')">7</button>
+    <button class="number" onclick="press('8')">8</button>
+    <button class="number" onclick="press('9')">9</button>
+    <button class="operator btn-back" onclick="backspace()">←</button>
+    <button class="operator btn-history-clear" onclick="clearHistory()">履歴消去</button>
+
+    <!-- 2行目 -->
+    <button class="number" onclick="press('4')">4</button>
+    <button class="number" onclick="press('5')">5</button>
+    <button class="number" onclick="press('6')">6</button>
+    <button class="operator btn-ac" onclick="clearDisplay()">AC</button>
+    <button class="operator btn-minus" onclick="press('-')">−</button>
+
+    <!-- 3行目 -->
+    <button class="number" onclick="press('1')">1</button>
+    <button class="number" onclick="press('2')">2</button>
+    <button class="number" onclick="press('3')">3</button>
+    <button class="operator btn-plus" onclick="press('+')">＋</button>
+    <button class="operator btn-multiply" onclick="press('*')">*</button>
+
+    <!-- 4行目 -->
+    <button class="number btn-zero" onclick="press('0')">0</button>
+    <button class="operator btn-equal" onclick="calculate()">=</button>
+    <button class="operator btn-divide" onclick="press('/')">/</button>
+  </div>
+</div>
+
+<script>
+const display = document.getElementById("display");
+const historyDiv = document.getElementById("history");
+
+let inputBuffer = "";
+const MAX_HISTORY = 50;
+
+// --- 高さ計算のための初期設定 ---
+const MAX_ROWS = 2;
+let singleRowHeight = 0;
+let maxDisplayHeight = 0;
+
+function initializeDisplayHeight() {
+    const originalValue = display.value;
+    const originalHeight = display.style.height;
+
+    // 1行の基本高さを計算
+    display.value = "1"; // 計算用に一時的な値を入れる
+    display.style.height = 'auto';
+    singleRowHeight = display.scrollHeight;
+    
+    // 最大の高さを計算 (2行分)
+    maxDisplayHeight = singleRowHeight * MAX_ROWS;
+
+    // 元に戻す
+    display.value = originalValue;
+    display.style.height = originalHeight;
+    adjustDisplayHeight(); // 初期表示を調整
+}
+
+// --- 表示エリアの高さ調整 ---
+function adjustDisplayHeight() {
+    display.style.height = 'auto'; // 一旦リセットしてscrollHeightを正しく取得
+    const newScrollHeight = display.scrollHeight;
+
+    if (newScrollHeight > maxDisplayHeight) {
+        display.style.height = maxDisplayHeight + 'px';
+    } else {
+        display.style.height = newScrollHeight + 'px';
+    }
+}
+
+// 数字・演算子入力
+function press(value) {
+  const lastChar = inputBuffer.slice(-1);
+
+  if (!['+', '-', '*', '/'].includes(value)) {
+    if (lastChar === "" && value === "0") return; // 先頭ゼロ無視
+    inputBuffer += value;
+  } else {
+    if (inputBuffer === "" || ['+', '-', '*', '/'].includes(lastChar)) {
+      return; // 連続演算子無視
+    }
+    inputBuffer += value;
+  }
+
+  display.value = formatDisplay(inputBuffer);
+  adjustDisplayHeight();
+}
+
+// 3桁区切り表示
+function formatDisplay(str) {
+  return str.replace(/\d+/g, n => Number(n).toLocaleString());
+}
+
+// 計算
+function calculate() {
+  let expr = inputBuffer.replace(/,/g,'');
+  if (['+', '-', '*', '/'].includes(expr.slice(-1))) return; // 末尾演算子無視
+  try {
+    let result = eval(expr);
+    let displayResult = Number(result).toLocaleString();
+    if (displayResult.replace(/,/g,'').length > 10) {
+      displayResult = Number(result.toPrecision(10)).toLocaleString();
+    }
+    addHistory(expr, displayResult);
+    inputBuffer = result.toString();
+    display.value = displayResult;
+    adjustDisplayHeight();
+  } catch {
+    // 無視
+  }
+}
+
+// 履歴追加（最大50件）
+function addHistory(expr, result) {
+  const div = document.createElement("div");
+  div.textContent = `${expr} = ${result}`;
+  historyDiv.appendChild(div);
+  if (historyDiv.children.length > MAX_HISTORY) {
+    historyDiv.removeChild(historyDiv.firstChild);
+  }
+  historyDiv.scrollTop = historyDiv.scrollHeight;
+}
+
+// バックスペース
+function backspace() {
+  inputBuffer = inputBuffer.slice(0,-1);
+  display.value = formatDisplay(inputBuffer);
+  adjustDisplayHeight();
+}
+
+// 表示クリア
+function clearDisplay() {
+  inputBuffer = "";
+  display.value = "";
+  adjustDisplayHeight();
+}
+
+// 履歴クリア
+function clearHistory() {
+  historyDiv.innerHTML = "";
+}
+
+// キーボード対応（テンキー含む）
+document.addEventListener('keydown', (e) => {
+  const key = e.key;
+  if (/\d/.test(key)) { press(key); }
+  else if (['+', '-', '*', '/'].includes(key)) { press(key); }
+  else if (key === 'Enter') { 
+    e.preventDefault(); // フォーム送信などデフォルトの挙動を抑制
+    calculate(); 
+  }
+  else if (key === 'Backspace') { backspace(); }
+});
+
+// ページ読み込み完了時に高さを初期化
+document.addEventListener('DOMContentLoaded', initializeDisplayHeight);
+</script>
+</body>
+</html>
